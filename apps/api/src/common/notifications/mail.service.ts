@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { resolve4 } from 'dns/promises';
 import * as nodemailer from 'nodemailer';
 
 export interface SendMailInput {
@@ -18,42 +19,59 @@ export interface SendMailInput {
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly transport: nodemailer.Transporter | null;
   private readonly from: string;
+  private readonly host?: string;
+  private readonly user?: string;
+  private readonly pass?: string;
+  private transportPromise: Promise<nodemailer.Transporter> | null = null;
 
   constructor(private readonly config: ConfigService) {
-    const host = this.config.get<string>('smtp.host');
-    const user = this.config.get<string>('smtp.user');
-    const pass = this.config.get<string>('smtp.pass');
+    this.host = this.config.get<string>('smtp.host');
+    this.user = this.config.get<string>('smtp.user');
+    this.pass = this.config.get<string>('smtp.pass');
     this.from = this.config.get<string>('smtp.from')!;
 
-    if (!host || !user || !pass) {
+    if (!this.host || !this.user || !this.pass) {
       this.logger.warn(
         'SMTP is not configured (SMTP_HOST/SMTP_USER/SMTP_PASS) — registration emails will be logged, not sent.',
       );
-      this.transport = null;
-      return;
     }
+  }
 
-    this.transport = nodemailer.createTransport({
-      host,
+  // Render's network has no outbound IPv6 route to Gmail's SMTP endpoint —
+  // and nodemailer resolves both A/AAAA records and picks one at random
+  // per connection (see nodemailer/lib/shared's resolveHostname), so
+  // roughly half of all send attempts hung for ~a minute on the
+  // unreachable AAAA address before failing with ENETUNREACH (confirmed
+  // in production). Resolving to a literal IPv4 address ourselves and
+  // passing it as `host` sidesteps nodemailer's resolver entirely — a
+  // literal IP short-circuits it (see the `net.isIP` check in
+  // resolveHostname). `tls.servername` keeps SNI/cert hostname
+  // verification pointed at the real hostname despite connecting by IP.
+  private async buildTransport(host: string, user: string, pass: string) {
+    let connectHost = host;
+    try {
+      const addresses = await resolve4(host);
+      if (addresses.length > 0) connectHost = addresses[0];
+    } catch (err) {
+      this.logger.warn(`IPv4 resolution for ${host} failed, falling back to hostname: ${err}`);
+    }
+    return nodemailer.createTransport({
+      host: connectHost,
       port: this.config.get<number>('smtp.port'),
       secure: this.config.get<boolean>('smtp.secure'),
       auth: { user, pass },
-      // Render's network has no outbound IPv6 route to Gmail's SMTP
-      // endpoint — connecting over the AAAA record hangs for ~a minute
-      // then fails with ENETUNREACH (confirmed in production), leaving an
-      // orphaned unverified user row and a failed registration request.
-      // Forcing IPv4 avoids that route entirely.
-      family: 4,
+      tls: { servername: host },
     });
   }
 
   async sendMail({ to, subject, text, html }: SendMailInput) {
-    if (!this.transport) {
+    if (!this.host || !this.user || !this.pass) {
       this.logger.warn(`SMTP not configured — would have sent "${subject}" to ${to}: ${text}`);
       return;
     }
-    await this.transport.sendMail({ from: this.from, to, subject, text, html });
+    this.transportPromise ??= this.buildTransport(this.host, this.user, this.pass);
+    const transport = await this.transportPromise;
+    await transport.sendMail({ from: this.from, to, subject, text, html });
   }
 }
