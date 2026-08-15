@@ -52,13 +52,21 @@ const FINANCE_NAV = [
   { href: '/finance', icon: '$', label: 'Financial & Accounting' },
 ];
 
-const ALL_NAV = [...NAV, ...HR_NAV, ...MY_HR_NAV, ...FINANCE_NAV];
+// Driver App (per user request, not in the original SRS) — DRIVER-role
+// self-service, same shape as My HR: a driver only ever sees their own
+// assigned deliveries (enforced server-side, see MyDeliveriesController).
+const MY_DELIVERIES_NAV = [
+  { href: '/my-deliveries', icon: '▶', label: 'My Deliveries' },
+];
+
+const ALL_NAV = [...NAV, ...HR_NAV, ...MY_HR_NAV, ...FINANCE_NAV, ...MY_DELIVERIES_NAV];
 
 const SECTIONS = [
   { key: 'admin', title: 'Admin / Backend', items: NAV },
   { key: 'hr', title: 'Human Resources', items: HR_NAV },
   { key: 'my-hr', title: 'My HR', items: MY_HR_NAV },
   { key: 'finance', title: 'Financial & Accounting', items: FINANCE_NAV },
+  { key: 'my-deliveries', title: 'Driver', items: MY_DELIVERIES_NAV },
 ];
 
 function sectionHasActiveItem(items: { href: string }[], pathname: string | null) {
@@ -83,9 +91,16 @@ function sectionHasActiveItem(items: { href: string }[], pathname: string | null
 // unfiltered so legitimate Owners don't see a flash of a stripped-down nav.
 function visibleSections(role: UserRole | null) {
   if (role === null || role === 'OWNER') return SECTIONS;
-  if (role === 'HR_MANAGER') return SECTIONS.filter((s) => s.key !== 'admin' && s.key !== 'finance');
+  // Driver App (per user request): least-privilege, same shape as
+  // SUPPORT_AGENT below — exactly their own section, plus My HR (drivers
+  // are Employee records too, created via the same HR login flow as every
+  // other staff role, so self-service HR applies to them the same way).
+  if (role === 'DRIVER') {
+    return [...SECTIONS.filter((s) => s.key === 'my-deliveries' || s.key === 'my-hr')];
+  }
+  if (role === 'HR_MANAGER') return SECTIONS.filter((s) => s.key !== 'admin' && s.key !== 'finance' && s.key !== 'my-deliveries');
   if (role === 'STORE_MANAGER' || role === 'FULFILLMENT') {
-    return SECTIONS.filter((s) => s.key !== 'hr' && s.key !== 'finance').map((s) =>
+    return SECTIONS.filter((s) => s.key !== 'hr' && s.key !== 'finance' && s.key !== 'my-deliveries').map((s) =>
       s.key === 'admin'
         ? {
             ...s,

@@ -16,6 +16,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
 import { CmsModule } from './modules/cms/cms.module';
 import { CrmModule } from './modules/crm/crm.module';
+import { DeliveryModule } from './modules/delivery/delivery.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { HealthModule } from './modules/health/health.module';
 import { HrModule } from './modules/hr/hr.module';
@@ -43,6 +44,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     CartModule,
     CheckoutModule,
     OrdersModule,
+    DeliveryModule,
     InventoryModule,
     CrmModule,
     MarketingModule,

@@ -14,6 +14,7 @@ const ORDER_LIST_INCLUDE = {
   items: true,
   user: { select: { id: true, name: true, email: true } },
   warehouse: true,
+  delivery: { include: { driver: { select: { id: true, name: true, phone: true } } } },
 } satisfies Prisma.OrderInclude;
 
 // Which transitions are allowed out of each status. Entering CANCELLED/
@@ -52,7 +53,11 @@ export class OrdersService {
   async getForUser(userId: string, orderId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
-      include: { items: { include: { product: true, variant: true } }, warehouse: true },
+      include: {
+        items: { include: { product: true, variant: true } },
+        warehouse: true,
+        delivery: { include: { driver: { select: { id: true, name: true, phone: true } } } },
+      },
     });
     if (!order) throw new NotFoundException('Order not found');
     return order;
@@ -80,7 +85,11 @@ export class OrdersService {
     const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { deliveryConfirmedAt: new Date() },
-      include: { items: { include: { product: true, variant: true } }, warehouse: true },
+      include: {
+        items: { include: { product: true, variant: true } },
+        warehouse: true,
+        delivery: { include: { driver: { select: { id: true, name: true, phone: true } } } },
+      },
     });
 
     await this.activityLog.record({
@@ -146,6 +155,7 @@ export class OrdersService {
         items: { include: { product: true, variant: true } },
         user: { select: { id: true, name: true, email: true, phone: true } },
         warehouse: true,
+        delivery: { include: { driver: { select: { id: true, name: true, phone: true } } } },
       },
     });
     if (!order) throw new NotFoundException('Order not found');

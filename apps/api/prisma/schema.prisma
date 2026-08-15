@@ -27,6 +27,10 @@ enum UserRole {
   FULFILLMENT
   SUPPORT_AGENT
   HR_MANAGER
+  // Delivery driver — a staff login like the others (created via the same
+  // HR employee-login flow, see hr/dto/create-login.dto.ts's STAFF_ROLES),
+  // scoped to their own assigned Delivery rows only. See Delivery below.
+  DRIVER
 }
 
 enum CustomerTier {
@@ -133,6 +137,7 @@ model User {
   otpCodes            OtpCode[]
   notifications       Notification[]
   employee       Employee?
+  deliveriesAsDriver Delivery[] @relation("DriverDeliveries")
   reviewedLeaveRequests    LeaveRequest[]     @relation("LeaveReviewer")
   reviewedShiftSwaps       ShiftSwapRequest[] @relation("SwapReviewer")
   goalsCreated         PerformanceGoal[]
@@ -523,9 +528,74 @@ model Order {
   loyaltyLedgerEntries LoyaltyLedgerEntry[]
   supportTickets       SupportTicket[]
   paymentTransactions  PaymentTransaction[]
+  delivery             Delivery?
 
   @@index([userId])
   @@index([warehouseId])
+  @@index([status])
+}
+
+enum DeliveryStatus {
+  ASSIGNED
+  EN_ROUTE_TO_PICKUP
+  PICKED_UP
+  EN_ROUTE_TO_CUSTOMER
+  DELIVERED
+  FAILED
+}
+
+// Driver App (per user request, not in the original SRS/wireframes — see
+// docs/SRS.md's HR-module precedent for "scoped and approved directly with
+// the user" net-new features). One row per Order once a driver is assigned
+// — 1:1, not 1:N, since this schema doesn't support split/multi-driver
+// shipments (matches Order's own single-warehouse design, see
+// checkout.service.ts's header comment). Status transitions here drive the
+// matching Order.status transition via OrdersService.updateStatus() (not
+// duplicated logic — see DeliveryService) — PICKED_UP maps to SHIPPED,
+// DELIVERED maps to DELIVERED, so the customer-facing order/receipt views
+// and this table never disagree about where the order actually is.
+//
+// GPS scope (per user decision): capture coordinates + timestamps for the
+// receipt and let the driver deep-link out to Google/Apple Maps for actual
+// turn-by-turn directions — no in-app map rendering or live route, no
+// third-party maps SDK/billing dependency. currentLat/currentLng/
+// lastLocationAt are a single last-known-position snapshot (overwritten on
+// each update), not a location history — enough for "where's my driver
+// roughly now," not a full breadcrumb trail.
+model Delivery {
+  id       String         @id @default(uuid())
+  orderId  String         @unique
+  order    Order          @relation(fields: [orderId], references: [id])
+  driverId String
+  driver   User           @relation("DriverDeliveries", fields: [driverId], references: [id])
+  status   DeliveryStatus @default(ASSIGNED)
+
+  // Snapshotted at PICKED_UP time from the driver's browser geolocation —
+  // deliberately not just copied from Warehouse's own address, since the
+  // driver's actual GPS position at pickup is the more useful/honest record
+  // for the receipt (confirms they were really there).
+  pickupLat  Float?
+  pickupLng  Float?
+  pickedUpAt DateTime? @db.Timestamptz(3)
+
+  // Snapshotted at DELIVERED time, same reasoning as pickup above.
+  deliveryLat  Float?
+  deliveryLng  Float?
+  deliveredAt  DateTime? @db.Timestamptz(3)
+
+  // Last-known position while EN_ROUTE_* — see class comment on why this
+  // isn't a history table.
+  currentLat     Float?
+  currentLng     Float?
+  lastLocationAt DateTime? @db.Timestamptz(3)
+
+  notes String?
+
+  assignedAt DateTime @default(now()) @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([driverId])
   @@index([status])
 }
 

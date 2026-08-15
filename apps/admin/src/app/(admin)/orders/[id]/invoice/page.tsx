@@ -24,7 +24,20 @@ interface InvoiceOrder {
   shippingAddress: { recipient?: string; phone?: string; line1?: string; city?: string };
   items: InvoiceItem[];
   deliveryConfirmedAt: string | null;
+  delivery: {
+    status: string;
+    driver: { name: string; phone: string | null };
+    pickedUpAt: string | null;
+    pickupLat: number | null;
+    pickupLng: number | null;
+    deliveredAt: string | null;
+    deliveryLat: number | null;
+    deliveryLng: number | null;
+  } | null;
 }
+
+const mapsUrl = (lat: number, lng: number) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('en-UG', { dateStyle: 'medium', timeStyle: 'short' });
 
 // Mirrors apps/storefront/src/lib/api.ts's formatDualPrice() exactly — same
 // static, manually-set rate — so a staff member's copy of an invoice never
@@ -177,6 +190,31 @@ export default function AdminInvoicePage(props: PageProps<'/orders/[id]/invoice'
             <div className="text-gray-500 text-[10px] pt-1">Payment method: {order.paymentMethod?.replace(/_/g, ' ') ?? '—'}</div>
           </div>
         </div>
+
+        {order.delivery && (
+          <div className="mb-8 text-[11px] border-t border-gray-200 pt-4">
+            <div className="text-[10px] uppercase text-gray-400 mb-1.5">Delivery</div>
+            <div className="text-gray-700">
+              Driver: {order.delivery.driver.name}{order.delivery.driver.phone ? ` (${order.delivery.driver.phone})` : ''}
+            </div>
+            {order.delivery.pickedUpAt && (
+              <div className="text-gray-500">
+                Picked up: {fmtDateTime(order.delivery.pickedUpAt)}
+                {order.delivery.pickupLat && order.delivery.pickupLng && (
+                  <> — <a href={mapsUrl(order.delivery.pickupLat, order.delivery.pickupLng)} target="_blank" rel="noreferrer" className="underline">GPS location</a></>
+                )}
+              </div>
+            )}
+            {order.delivery.deliveredAt && (
+              <div className="text-gray-500">
+                Delivered: {fmtDateTime(order.delivery.deliveredAt)}
+                {order.delivery.deliveryLat && order.delivery.deliveryLng && (
+                  <> — <a href={mapsUrl(order.delivery.deliveryLat, order.delivery.deliveryLng)} target="_blank" rel="noreferrer" className="underline">GPS location</a></>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {order.deliveryConfirmedAt && <ReceivedStamp confirmedAt={order.deliveryConfirmedAt} />}
 

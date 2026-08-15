@@ -12,7 +12,20 @@ interface OrderDetail {
   totalUgx: number;
   deliveryMethod: string;
   deliveryConfirmedAt: string | null;
+  delivery: {
+    status: string;
+    driver: { name: string; phone: string | null };
+  } | null;
 }
+
+const DELIVERY_STATUS_LABEL: Record<string, string> = {
+  ASSIGNED: 'A driver has been assigned to your order',
+  EN_ROUTE_TO_PICKUP: 'Your driver is heading to pick up your order',
+  PICKED_UP: 'Your order has been picked up',
+  EN_ROUTE_TO_CUSTOMER: 'Your driver is on the way to you',
+  DELIVERED: 'Your order has been delivered',
+  FAILED: 'Delivery attempt unsuccessful — our team will be in touch',
+};
 
 const STEPS = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
 
@@ -71,6 +84,16 @@ export default function OrderTrackingPage(props: PageProps<'/orders/[id]'>) {
           ))}
         </div>
       </Card>
+      {order.delivery && (
+        <Card className="mt-4">
+          <div className="text-[10px] uppercase text-text-2 mb-1">Delivery</div>
+          <div className="text-sm">{DELIVERY_STATUS_LABEL[order.delivery.status] ?? order.delivery.status}</div>
+          <div className="text-xs text-text-2 mt-1">
+            Driver: {order.delivery.driver.name}{order.delivery.driver.phone ? ` · ${order.delivery.driver.phone}` : ''}
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         <Card>
           <div className="text-[10px] uppercase text-text-2 mb-1">Total</div>

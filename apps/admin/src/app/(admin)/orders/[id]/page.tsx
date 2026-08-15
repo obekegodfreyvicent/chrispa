@@ -12,6 +12,24 @@ interface OrderItem {
   product: { name: string };
   variant: { size: string } | null;
 }
+interface Driver {
+  id: string;
+  name: string;
+  phone: string | null;
+}
+interface Delivery {
+  status: string;
+  driver: Driver;
+  pickupLat: number | null;
+  pickupLng: number | null;
+  pickedUpAt: string | null;
+  deliveryLat: number | null;
+  deliveryLng: number | null;
+  deliveredAt: string | null;
+  currentLat: number | null;
+  currentLng: number | null;
+  lastLocationAt: string | null;
+}
 interface OrderDetail {
   orderNumber: string;
   status: string;
@@ -27,7 +45,12 @@ interface OrderDetail {
   user: { name: string; email: string | null; phone: string | null } | null;
   warehouse: { name: string } | null;
   deliveryConfirmedAt: string | null;
+  delivery: Delivery | null;
 }
+
+const fmtDateTime = (iso: string) =>
+  new Date(iso).toLocaleString('en-UG', { dateStyle: 'medium', timeStyle: 'short' });
+const mapsUrl = (lat: number, lng: number) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-UG', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -49,10 +72,13 @@ const STATUS_VARIANT: Record<string, 'ok' | 'pending' | 'danger'> = {
 export default function AdminOrderDetailPage(props: PageProps<'/orders/[id]'>) {
   const { id } = use(props.params);
   const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [drivers, setDrivers] = useState<Driver[] | null>(null);
   const [authed, setAuthed] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
 
   function load() {
     authedFetch(`/admin/orders/${id}`)
@@ -68,8 +94,30 @@ export default function AdminOrderDetailPage(props: PageProps<'/orders/[id]'>) {
       return;
     }
     load();
+    authedFetch('/admin/drivers').then((r) => (r.ok ? r.json() : [])).then(setDrivers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  async function assignDriver(driverId: string) {
+    if (!driverId) return;
+    setAssignError(null);
+    setAssigning(true);
+    try {
+      const res = await authedFetch(`/admin/orders/${id}/assign-driver`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driverId }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setAssignError(body?.message ?? 'Could not assign a driver.');
+        return;
+      }
+      load();
+    } finally {
+      setAssigning(false);
+    }
+  }
 
   async function transition(status: string) {
     setError(null);
@@ -168,6 +216,76 @@ export default function AdminOrderDetailPage(props: PageProps<'/orders/[id]'>) {
           <div className="flex justify-between text-sm font-semibold mt-2"><span>Total</span><span className="text-gold-light">UGX {order.totalUgx.toLocaleString()}</span></div>
         </Card>
       </div>
+
+      <Card className="mt-4">
+        <div className="text-[10px] uppercase text-text-2 mb-2">Delivery / Driver</div>
+        {order.delivery ? (
+          <div className="text-xs space-y-1">
+            <div className="flex items-center gap-2">
+              <span>{order.delivery.driver.name}{order.delivery.driver.phone ? ` · ${order.delivery.driver.phone}` : ''}</span>
+              <Status variant={order.delivery.status === 'DELIVERED' ? 'ok' : order.delivery.status === 'FAILED' ? 'danger' : 'pending'}>
+                {order.delivery.status.replace(/_/g, ' ')}
+              </Status>
+            </div>
+            {order.delivery.pickedUpAt && (
+              <div className="text-text-2">
+                Picked up {fmtDateTime(order.delivery.pickedUpAt)}
+                {order.delivery.pickupLat && order.delivery.pickupLng && (
+                  <> · <a href={mapsUrl(order.delivery.pickupLat, order.delivery.pickupLng)} target="_blank" rel="noreferrer" className="text-gold-light">map</a></>
+                )}
+              </div>
+            )}
+            {order.delivery.deliveredAt && (
+              <div className="text-text-2">
+                Delivered {fmtDateTime(order.delivery.deliveredAt)}
+                {order.delivery.deliveryLat && order.delivery.deliveryLng && (
+                  <> · <a href={mapsUrl(order.delivery.deliveryLat, order.delivery.deliveryLng)} target="_blank" rel="noreferrer" className="text-gold-light">map</a></>
+                )}
+              </div>
+            )}
+            {order.delivery.lastLocationAt && order.delivery.currentLat && order.delivery.currentLng && (
+              <div className="text-text-2">
+                Last known location {fmtDateTime(order.delivery.lastLocationAt)} ·{' '}
+                <a href={mapsUrl(order.delivery.currentLat, order.delivery.currentLng)} target="_blank" rel="noreferrer" className="text-gold-light">map</a>
+              </div>
+            )}
+            <div className="pt-2">
+              <span className="text-text-2">Reassign: </span>
+              <select
+                disabled={assigning}
+                onChange={(e) => assignDriver(e.target.value)}
+                defaultValue=""
+                className="bg-white border border-[#CBDCC1] rounded-md px-2 py-1 text-[11px]"
+              >
+                <option value="" disabled>Choose a driver…</option>
+                {drivers?.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <select
+              disabled={assigning}
+              onChange={(e) => assignDriver(e.target.value)}
+              defaultValue=""
+              className="bg-white border border-[#CBDCC1] rounded-md px-2.5 py-2 text-[11.5px]"
+            >
+              <option value="" disabled>Choose a driver…</option>
+              {drivers?.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+            {drivers?.length === 0 && (
+              <span className="text-xs text-text-2">
+                No drivers yet — create one via HR → Employees with login role "Driver".
+              </span>
+            )}
+          </div>
+        )}
+        {assignError && <p className="text-xs text-danger mt-2">{assignError}</p>}
+      </Card>
 
       <Card className="mt-4 p-0 overflow-hidden">
         <div className="overflow-x-auto">

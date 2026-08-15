@@ -10,7 +10,7 @@ export function getAccessToken() {
   return localStorage.getItem(ACCESS_KEY);
 }
 
-export type UserRole = 'OWNER' | 'STORE_MANAGER' | 'FULFILLMENT' | 'SUPPORT_AGENT' | 'HR_MANAGER' | 'CUSTOMER';
+export type UserRole = 'OWNER' | 'STORE_MANAGER' | 'FULFILLMENT' | 'SUPPORT_AGENT' | 'HR_MANAGER' | 'DRIVER' | 'CUSTOMER';
 
 // JWT segments are base64url (RFC 7515), not plain base64 — atob() decodes
 // plain base64 and would silently mangle any payload whose encoded bytes
