@@ -98,7 +98,7 @@ export default function CheckoutPage() {
         setError(Array.isArray(body?.message) ? body.message.join(', ') : (body?.message ?? 'Could not place your order.'));
         return;
       }
-      router.push(`/orders/${body.id}`);
+      router.push(`/orders/${body.order.id}`);
     } finally {
       setPending(false);
     }
