@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -46,6 +47,8 @@ function hashToken(token: string) {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -92,10 +95,23 @@ export class AuthService {
       userAgent: context.userAgent,
     });
 
-    await Promise.all([
+    // allSettled, not all: the account row above is already committed, so a
+    // delivery failure on either channel (provider outage, bad credentials,
+    // network issue — as opposed to "not configured", which OtpService
+    // already handles without throwing) must not crash this request and
+    // leave the customer stuck on an orphaned unverified account with a
+    // bare 500. The OTP code itself is still persisted either way, so
+    // "Resend code" gives them a real second chance once the provider issue
+    // is fixed.
+    const results = await Promise.allSettled([
       this.otp.issue(user.id, OtpChannel.EMAIL, dto.email),
       this.otp.issue(user.id, OtpChannel.SMS, dto.phone),
     ]);
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error(`Registration OTP dispatch failed for user ${user.id}: ${result.reason}`);
+      }
+    }
 
     return {
       userId: user.id,
