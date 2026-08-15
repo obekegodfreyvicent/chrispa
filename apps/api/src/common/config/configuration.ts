@@ -54,16 +54,18 @@ export default () => {
     // Registration OTP delivery (see OtpService/MailService/SmsService).
     // Deliberately no dev-fallback default for the credential fields, same
     // reasoning as flutterwave above — sending a real code through a
-    // made-up SMTP/Africa's Talking account would just fail loudly at send
+    // made-up Brevo/Africa's Talking account would just fail loudly at send
     // time instead of silently, which NotificationsModule's boot-time check
     // turns into an upfront warning instead.
-    smtp: {
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT ?? '587', 10),
-      secure: process.env.SMTP_SECURE === 'true',
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-      from: process.env.SMTP_FROM ?? 'ChrisPa Scents and Soaps <no-reply@chrispa.ug>',
+    //
+    // Brevo's HTTP API, not SMTP — Render's free web services block all
+    // outbound SMTP traffic (ports 25/465/587) as of Sep 2025, confirmed in
+    // production against both Gmail and Brevo's own SMTP relay (see
+    // MailService). Brevo's REST API runs over HTTPS, which isn't affected.
+    brevo: {
+      apiKey: process.env.BREVO_API_KEY,
+      fromEmail: process.env.EMAIL_FROM_ADDRESS ?? 'no-reply@chrispa.ug',
+      fromName: process.env.EMAIL_FROM_NAME ?? 'ChrisPa Scents and Soaps',
     },
     africasTalking: {
       username: process.env.AT_USERNAME,
