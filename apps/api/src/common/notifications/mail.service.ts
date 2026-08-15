@@ -40,6 +40,12 @@ export class MailService {
       port: this.config.get<number>('smtp.port'),
       secure: this.config.get<boolean>('smtp.secure'),
       auth: { user, pass },
+      // Render's network has no outbound IPv6 route to Gmail's SMTP
+      // endpoint — connecting over the AAAA record hangs for ~a minute
+      // then fails with ENETUNREACH (confirmed in production), leaving an
+      // orphaned unverified user row and a failed registration request.
+      // Forcing IPv4 avoids that route entirely.
+      family: 4,
     });
   }
 
