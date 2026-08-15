@@ -77,13 +77,25 @@ export default function MyDeliveryDetailPage(props: PageProps<'/my-deliveries/[i
   const [delivery, setDelivery] = useState<Delivery | null>(null);
   const [authed, setAuthed] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sharingLocation, setSharingLocation] = useState(false);
 
   function load() {
     authedFetch(`/driver/deliveries/${id}`)
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (r.status === 403) {
+          setLoadError("This page is only for driver accounts — log in as the driver's own account to see this delivery.");
+          return null;
+        }
+        if (!r.ok) {
+          setLoadError('Delivery not found.');
+          return null;
+        }
+        setLoadError(null);
+        return r.json();
+      })
       .then(setDelivery)
       .finally(() => setLoading(false));
   }
@@ -178,7 +190,16 @@ export default function MyDeliveryDetailPage(props: PageProps<'/my-deliveries/[i
       </Card>
     );
   }
-  if (loading || !delivery) return <div className="text-sm text-text-2">Loading…</div>;
+  if (loading) return <div className="text-sm text-text-2">Loading…</div>;
+
+  if (loadError) {
+    return (
+      <Card>
+        <p className="text-sm text-text-2">{loadError}</p>
+      </Card>
+    );
+  }
+  if (!delivery) return <div className="text-sm text-text-2">Loading…</div>;
 
   const { order } = delivery;
   const next = NEXT_STEP[delivery.status];

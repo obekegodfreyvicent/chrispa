@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { authedFetch, getAccessToken } from '@/lib/auth-client';
 import { useRefetchOnFocus } from '@/lib/use-refetch-on-focus';
 import { Card, Chip, Status, ButtonGhost } from '@/components/ui';
@@ -34,19 +34,27 @@ const ACTIVE = ['ASSIGNED', 'EN_ROUTE_TO_PICKUP', 'PICKED_UP', 'EN_ROUTE_TO_CUST
 export default function MyDeliveriesPage() {
   const [deliveries, setDeliveries] = useState<Delivery[] | null>(null);
   const [authed, setAuthed] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
 
   function load() {
     if (!getAccessToken()) {
       setAuthed(false);
       return;
     }
-    authedFetch('/driver/deliveries')
-      .then((r) => (r.ok ? r.json() : []))
-      .then(setDeliveries);
+    authedFetch('/driver/deliveries').then((r) => {
+      if (r.status === 403) {
+        setForbidden(true);
+        setDeliveries([]);
+        return;
+      }
+      setForbidden(false);
+      return r.ok ? r.json() : [];
+    }).then((data) => {
+      if (data) setDeliveries(data);
+    });
   }
 
   useRefetchOnFocus(load);
-  useEffect(load, []);
 
   if (!authed) {
     return (
@@ -58,6 +66,17 @@ export default function MyDeliveriesPage() {
     );
   }
   if (!deliveries) return <div className="text-sm text-text-2">Loading…</div>;
+
+  if (forbidden) {
+    return (
+      <Card>
+        <p className="text-sm text-text-2">
+          This page is only for driver accounts. You&apos;re logged in with a role that doesn&apos;t have any
+          deliveries assigned to it — log in as the driver&apos;s own account to see their deliveries here.
+        </p>
+      </Card>
+    );
+  }
 
   const active = deliveries.filter((d) => ACTIVE.includes(d.status));
   const done = deliveries.filter((d) => !ACTIVE.includes(d.status));
