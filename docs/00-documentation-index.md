@@ -152,11 +152,17 @@ them blindly during a stale-looking review.
   than waiting out the current access token's TTL. See [`07`](./07-authentication-and-authorization.md),
   [`21`](./21-data-flow-diagram.md)'s Admin Customer Management diagram, and
   [`22`](./22-entity-relationship-diagram.md) for `User.suspendedAt`/`deletedAt`'s exact semantics.
-- **Netlify "Account credit usage exceeded" platform bug** — a live admin-site deploy was blocked by this
-  error despite the account's own API showing `{included: 300, used: 0}` (zero credits actually used, full
-  monthly allotment available). A documented, actively-reported Netlify-side bug, not a ChrisPa issue — see
-  [`13`](./13-incident-response-and-troubleshooting.md)'s incident log for the forum references and current
-  status.
+- **Netlify "Account credit usage exceeded" platform bug** — confirmed account-wide (blocks both admin and
+  storefront deploys), despite the account's own API showing `{included: 300, used: 0}` (zero credits
+  actually used, full monthly allotment available). A documented, actively-reported Netlify-side bug, not a
+  ChrisPa issue — see [`13`](./13-incident-response-and-troubleshooting.md)'s incident log for the forum
+  references and current status. Any fix pushed while this is open is real and correct in the repo but not
+  yet visible on the live sites — check incident #5's status before assuming a shipped fix is actually live.
+- **Checkout redirect bug (fixed in code, not yet live — see above)** — `POST /checkout` returns
+  `{ order, checkoutUrl }`; the post-submit redirect read `body.id` instead of `body.order.id`, sending
+  customers to `/orders/undefined` and a false "Order not found" after every successful Cash-on-Delivery
+  order. The order itself was always placed correctly — see
+  [`13`](./13-incident-response-and-troubleshooting.md) incident #6.
 - **Three near-term priorities** stand out across this whole set as worth doing before the rest: push the
   repo to a remote, add database backups, and wire forgot-password/login-alert/staff-temp-password delivery
   to the email+SMS services (registration OTP already uses real Brevo (HTTP API, not SMTP — see
