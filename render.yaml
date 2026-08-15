@@ -1,0 +1,54 @@
+databases:
+  - name: chrispa-postgres
+    plan: free
+    databaseName: chrispa
+    user: chrispa
+
+services:
+  - name: chrispa-redis
+    type: keyvalue
+    plan: free
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: allow all (Render-internal connections only reach this service; tighten later if needed)
+
+  - name: chrispa-api
+    type: web
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run prisma:generate --workspace apps/api && npm run build --workspace apps/api
+    startCommand: cd apps/api && node dist/main.js
+    preDeployCommand: npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: chrispa-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: chrispa-redis
+          type: keyvalue
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_MFA_CHALLENGE_SECRET
+        generateValue: true
+      - key: TOTP_ENCRYPTION_KEY
+        generateValue: true
+      # Comma-separated Netlify site URLs (storefront, admin) — no default,
+      # since a wrong/missing value here breaks every browser request via
+      # CORS. Fill in during Blueprint setup or from the service's
+      # Environment tab afterward.
+      - key: CORS_ORIGINS
+        sync: false
+      # Bare hostname (no scheme/port) — only needed once biometric login
+      # is exercised against a real domain; safe to leave unset for now.
+      - key: WEBAUTHN_RP_ID
+        sync: false
+      # Used to build absolute URLs for locally-stored uploads. Set to this
+      # service's Render URL once known (Settings tab), or leave unset —
+      # uploads aren't persisted on the free plan (no disk) regardless.
+      - key: PUBLIC_API_URL
+        sync: false

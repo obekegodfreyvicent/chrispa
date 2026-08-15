@@ -29,3 +29,6 @@ npm-debug.log*
 
 # testing
 coverage/
+
+# Local Netlify folder
+.netlify
