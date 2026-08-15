@@ -2,10 +2,11 @@
 
 The Word template (`Software_Development_and_DevOps_Documentation_v2_Observability.docx`) assumes a
 fully self-hosted operations platform built around ten infrastructure tools beyond the application stack
-itself. **None of these are adopted in ChrisPa today**, and this document argues most of them shouldn't be —
-yet — rather than pretending they exist. Each section states the template's intent, ChrisPa's current state
-(consistently: not adopted), a right-sized recommendation, and the concrete trigger that would justify
-revisiting the decision.
+itself. **None of these specific tools are adopted in ChrisPa today** (§17.3's underlying need — HTTPS/TLS —
+is satisfied by managed-platform equivalents now that production exists; see below), and this document argues
+most of the rest shouldn't be adopted — yet — rather than pretending they exist. Each section states the
+template's intent, ChrisPa's current state, a right-sized recommendation, and the concrete trigger that would
+justify revisiting the decision.
 
 ## 17.1 Infrastructure Automation — Ansible
 
@@ -37,13 +38,16 @@ application-level) admin isolation, or a dedicated ops/infra employee who'd main
 
 **Template intent**: ingress, routing, and automated HTTPS certificate management.
 
-**Current state**: not adopted — nothing is internet-facing.
+**Current state**: Traefik specifically — not adopted. But the trigger below has fired: `api` (Render),
+`storefront`, and `admin` (both Netlify) are all publicly deployed and served over HTTPS today, satisfied by
+each platform's own managed edge/TLS rather than a self-hosted Traefik instance — see
+[`02-system-architecture.md`](./02-system-architecture.md) for the live topology and
+[`11-deployment-and-configuration-management.md`](./11-deployment-and-configuration-management.md) for URLs.
 
-**Recommendation**: this is the one item on this list that becomes **required, not optional**, the moment
-anything is deployed publicly — HTTPS is non-negotiable for a site handling login credentials and (even
-cash-on-delivery) order/payment data. Whether that's Traefik specifically or a managed load balancer with
-automatic TLS (many hosting providers offer this out of the box) is an implementation choice, not a
-requirements question. **Trigger**: the first public deployment — sequence this before go-live, not after.
+**Recommendation**: the managed-platform TLS already in place satisfies the requirement this section exists
+to enforce — no unmet gap remains here. Revisit only if a future need (custom edge routing, a WAF, multiple
+backend services behind one hostname) outgrows what Render/Netlify's built-in edge can do; that's a real
+Traefik trigger, not "go live" (already happened without it).
 
 ## 17.4 Application Hosting — LXC
 
@@ -61,21 +65,32 @@ foreseeable for ChrisPa's architecture.
 
 **Template intent**: self-hosted email platform with DNS/TLS/anti-abuse/reputation management.
 
-**Current state**: iRedMail specifically — not adopted, and the recommendation below still holds. But
-ChrisPa now has **working, generic email and SMS delivery**: `MailService` (SMTP via `nodemailer` — any
-account works, from a Gmail app password to a real transactional-email SMTP endpoint) and `SmsService`
-(Africa's Talking) are both real integrations, currently used for registration OTP (see
-[`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md)). Both fall back to
-logging instead of sending when unconfigured — a documented dev convenience, not a placeholder. What
-remains a **functional gap** is narrower than it used to be: forgot-password, login-alert delivery, and
-staff temp-password delivery don't call these services yet, even though the services themselves now exist
-and work — that's integration work on each of those three features, not a provider-selection blocker.
+**Current state**: iRedMail specifically — not adopted, and the recommendation against it still holds. ChrisPa
+has **working, live email and SMS delivery**: `MailService` (Brevo's transactional HTTP API) and `SmsService`
+(Africa's Talking) are both real integrations, wired to registration OTP, configured on the production API,
+and confirmed delivering — a real registration completes in ~8 seconds with both codes received (see
+[`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md)). Getting here surfaced a
+real platform constraint worth remembering: **Render's free-tier web services block all outbound SMTP
+traffic** (ports 25/465/587, a policy since September 2025), so `MailService` originally built on generic SMTP
+via `nodemailer` had to be rewritten around an HTTP-based provider API instead — this is why the delivery code
+is now Brevo-specific rather than "any SMTP account works." Also worth remembering when touching Africa's
+Talking: its **sandbox mode never delivers real SMS to arbitrary real phone numbers** regardless of
+credentials — only to numbers explicitly registered as test recipients in the AT dashboard's simulator; real
+delivery to arbitrary customers needs a live (non-sandbox) AT account with purchased credit. Separately,
+forgot-password, login-alert delivery, and staff temp-password delivery still don't call `MailService`/
+`SmsService` at all yet, even with delivery itself now working — that's integration work on each of those
+three features, distinct from (and now the only remaining piece of) the delivery-provider gap this section
+used to describe. See incidents #2–#4 in
+[`13-incident-response-and-troubleshooting.md`](./13-incident-response-and-troubleshooting.md) for the full
+resolution history.
 
-**Recommendation**: for production, swap the generic SMTP endpoint for a real transactional email API (e.g.
-a hosted provider) rather than a self-hosted mail server — self-hosted email requires ongoing
-reputation/deliverability management that has nothing to do with ChrisPa's product and everything to do with
-becoming an email-infrastructure operator. Wiring forgot-password/login-alerts/temp-password delivery to the
-already-real `MailService`/`SmsService` is the more urgent near-term item now, independent of that swap.
+**Recommendation**: the urgent item — getting registration OTP delivery actually working in production — is
+**done**. Remaining work here is lower-priority: wire forgot-password/login-alerts/temp-password delivery to
+`MailService`/`SmsService` when those features are built, and move Africa's Talking off sandbox (a live
+account with purchased credit) before depending on SMS reaching real customer phones. A self-hosted mail
+server (iRedMail) remains the wrong direction regardless — it requires ongoing reputation/deliverability
+management that has nothing to do with ChrisPa's product and everything to do with becoming an
+email-infrastructure operator.
 
 ## 17.6 Team Communication — Zulip / Slack
 
@@ -142,9 +157,9 @@ itself.
 |---|---|---|---|
 | Ansible | No | Manual, documented setup | Second production host |
 | WireGuard | No | Provider firewall / security groups | Network-level compliance requirement |
-| Traefik/Certbot | No | Managed LB with auto-TLS, or Traefik itself | **First public deployment (required)** |
+| Traefik/Certbot | No | **Satisfied — Render/Netlify managed TLS, live today** | Custom edge routing needs outgrow the managed platforms |
 | LXC | No | Docker alone | Not foreseen |
-| iRedMail | No — but generic SMTP (`nodemailer`) + Africa's Talking SMS are already wired for registration OTP | Transactional email API for production | **Near-term (wire forgot-password/login-alerts/temp-password delivery to the existing services)** |
+| iRedMail | No — **satisfied: Brevo HTTP API + Africa's Talking sandbox, both configured and confirmed delivering in production** | Registration OTP delivery now works end-to-end (~8s, both channels); Africa's Talking still needs a live (non-sandbox) account before real customer phones can receive SMS | Move AT off sandbox before depending on real SMS delivery; wire forgot-password/login-alerts/temp-password to the same services when those features are built |
 | Zulip/Slack | No | Whatever the team already uses | N/A — not a platform concern |
 | Pi-hole | No | Public DNS via registrar | Not foreseen |
 | Nextcloud | No | Object storage for product/user media | Before production (media survives redeploy) |

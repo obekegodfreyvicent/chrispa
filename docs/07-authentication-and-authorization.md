@@ -22,9 +22,9 @@ code comments in `apps/api/src/modules/auth` (especially `two-factor.service.ts`
 
 `POST /auth/register` (FR-9) creates the `User` row but deliberately returns **no tokens** — it's a hard
 verification gate, not a self-completing signup. `OtpService.issue()` sends a 6-digit code to both channels
-in parallel: email via `MailService` (generic SMTP through `nodemailer` — any account works: Gmail app
-password, a domain mailbox, Mailtrap for local dev) and phone via `SmsService` (Africa's Talking, the
-Uganda/East-Africa-native SMS gateway chosen over Twilio for this project). The account cannot log in
+in parallel: email via `MailService` (Brevo's transactional HTTP API — **not SMTP**, see the production-status
+callout below for why) and phone via `SmsService` (Africa's Talking, the Uganda/East-Africa-native SMS
+gateway chosen over Twilio for this project). The account cannot log in
 (`POST /auth/login` returns `{ requiresVerification: true, userId }` in place of tokens) until
 `POST /auth/verify-otp` confirms **both** channels — `AuthService.verifyOtp()` is the only path that
 actually completes that login, mirroring `changePassword()`'s "issue tokens right after the gate that was
@@ -37,13 +37,39 @@ single-use, and it keeps a DB read from directly leaking a valid code. They expi
 independent of the controller-level `@Throttle` (`POST /auth/resend-otp`).
 
 **Neither `MailService` nor `SmsService` is a stub** — both are real, working integrations, gated on their
-own env vars (`SMTP_HOST`/`SMTP_USER`/`SMTP_PASS`, `AT_USERNAME`/`AT_API_KEY`) with a documented,
-graceful fallback: if unset (a fresh local dev checkout, or a deliberately provider-less environment), both
-services log the would-be message instead of throwing, so registration still works end-to-end in dev without
-ever sending a real email or SMS. This is a materially different state from the "no delivery provider
-exists" gap this section used to describe — see Known gaps below for what's *actually* still blocked on that
-concern (forgot-password, login-alert delivery, admin invites, staff temp-password delivery — none of them
-call `MailService`/`SmsService` yet, but the services themselves are no longer the missing piece).
+own env vars (`BREVO_API_KEY`/`EMAIL_FROM_ADDRESS`/`EMAIL_FROM_NAME`, `AT_USERNAME`/`AT_API_KEY`) with a
+documented, graceful fallback: if unset (a fresh local dev checkout, or a deliberately provider-less
+environment), both services log the would-be message instead of throwing, so registration still works
+end-to-end in dev without ever sending a real email or SMS. This is a materially different state from the "no
+delivery provider exists" gap this section used to describe — see Known gaps below for what's *actually*
+still blocked on that concern (forgot-password, login-alert delivery, admin invites, staff temp-password
+delivery — none of them call `MailService`/`SmsService` yet, but the services themselves are no longer the
+missing piece).
+
+> **Production status (confirmed, working)**: both channels are live in production, verified end-to-end (a
+> real registration returns `201` in ~8 seconds with both codes delivered). Getting here took three real
+> fixes, in order:
+>
+> 1. **Neither provider was configured at all** (initial state) — both services silently logged codes to
+>    Render's server logs instead of sending them, so every registration created a real account with no way
+>    for the customer to receive either code. This is logged as incident #2 in
+>    [`13-incident-response-and-troubleshooting.md`](./13-incident-response-and-troubleshooting.md).
+> 2. **`MailService` originally used generic SMTP via `nodemailer`** (Gmail app password, then Brevo's SMTP
+>    relay as a second attempt) — both failed identically, ~45s "Connection timeout" on every send. Root
+>    cause: **Render blocks all outbound SMTP traffic (ports 25/465/587) on free-tier web services**, a
+>    platform policy since September 2025 — not a credentials or DNS problem, and no per-provider workaround
+>    fixes it. `MailService` was rewritten to call Brevo's transactional HTTP API (`POST
+>    https://api.brevo.com/v3/smtp/email`, plain HTTPS, unaffected by the port block) instead of SMTP
+>    entirely, dropping the `nodemailer` dependency. This trades away the earlier "any SMTP account works"
+>    generality for staying on Render's free plan.
+> 3. **`AuthService.register()` had no error handling around the OTP dispatch** — `Promise.all` meant a real
+>    provider error (as opposed to "not configured", which was already handled) crashed the whole request
+>    with a bare `500`, after the `User` row was already committed — an orphaned unverified account and a
+>    failed request, confirmed live when Africa's Talking briefly rejected a freshly-generated sandbox API key
+>    with `401` (new keys take a few minutes to propagate). Switched to `Promise.allSettled` with per-channel
+>    error logging, so a delivery failure on either channel degrades gracefully instead of crashing —
+>    registration still succeeds, and `POST /auth/resend-otp` gives a real second chance once whatever caused
+>    the failure clears.
 
 **"Sign in/up with Google" (FR-8.4/FR-9.4)** is the one path that skips registration OTP entirely — Google
 has already verified the email server-side, which is the same authority `emailVerifiedAt` otherwise records.
@@ -74,6 +100,36 @@ after the response), `POST /auth/2fa/confirm` proves the user actually scanned i
 was buildable without any external delivery channel, unlike login-alert notifications (see Known gaps) —
 registration OTP above needed one too, and now has one (`MailService`/`SmsService`), just not for this
 purpose.
+
+**A real gap this exposed**: `AuthService.login()` decides `requiresTwoFactor: true` purely from the
+`twoFactorEnabled` flag, with no check that a `twoFactorSecret` actually exists — and the only enrollment
+path, `POST /auth/2fa/enroll`, requires an access token, which login refuses to issue while stuck in that
+state. An account with the flag set but no secret is therefore **permanently locked out**, with no
+self-service or admin-side recovery: there is no `OWNER`/`HR_MANAGER` route to reset another user's 2FA
+(confirmed by code review — the only writes to `twoFactorEnabled`/`twoFactorSecret` anywhere in `apps/api/src`
+are the self-service enroll/confirm/disable methods on `TwoFactorService` itself, plus the unrelated
+downgrade path in `account-settings.service.ts`). This is exactly the state `apps/api/prisma/seed.ts` leaves
+`chris@chrispa.ug` (`OWNER`), `patricia@chrispa.ug` (`STORE_MANAGER`), and `grace@chrispa.ug` (`HR_MANAGER`)
+in — it sets `twoFactorEnabled: true` for all three but never seeds a `twoFactorSecret`. This is a pre-existing
+seed-data gap, not something introduced alongside the production deploy.
+
+**Production status**: all three accounts now have real, working TOTP secrets in production, bootstrapped via
+a reviewable one-off script (`apps/api/prisma/seed-totp.ts`, added and removed as paired commits per account:
+`76621e1`/`df5040f` for `chris@chrispa.ug`, `344780e`/`5806bf7` for `patricia@chrispa.ug` and
+`grace@chrispa.ug`) that reused `TwoFactorService`'s own `otplib`/`encryptTotpSecret` code paths — the result
+is indistinguishable from a real self-service enrollment, just without a human present to submit the
+confirming code back. Run once via a temporary Render build-command step (see
+[`11-deployment-and-configuration-management.md`](./11-deployment-and-configuration-management.md) for that
+pattern), then the script was deleted from the repo both times so it can't accidentally regenerate and
+overwrite a secret later. The plaintext secrets themselves were relayed to the account owner directly, not
+stored in any document or committed to the repo. **Anyone logging into the OWNER/STORE_MANAGER/HR_MANAGER
+demo accounts in production now needs a TOTP authenticator app enrolled for that account** — `dennis@chrispa.ug`
+(`FULFILLMENT`) and `brenda@chrispa.ug` (`SUPPORT_AGENT`) still have `twoFactorEnabled: false` from seed data
+and log in normally. The same lockout applies to any **local** database seeded fresh from current `seed.ts`
+(e.g. after `prisma migrate reset && npm run db:seed`) — it is not production-specific, just went unnoticed
+locally because an existing, already-diverged local `chris` row predated the `twoFactorEnabled: true` change
+and `upsert`'s `update: {}` branch never overwrote it (see the seed-data note in
+[`03-database-design.md`](./03-database-design.md)).
 
 ## WebAuthn / passkeys
 
@@ -158,5 +214,13 @@ independently rejected by `JwtAuthGuard`/`RolesGuard` on the API regardless of w
   `.env` values, fine for one local environment, not for a shared one (see
   [`10-security-architecture.md`](./10-security-architecture.md)).
 - No MFA enforcement policy for `OWNER`/`HR_MANAGER` accounts specifically (2FA is opt-in for all roles
-  today) — worth revisiting once a production environment exists, per the template's "use MFA where
+  today) — worth revisiting now that a production environment exists, per the template's "use MFA where
   supported" guidance.
+- **No admin-side 2FA reset for another user** — see the Two-factor authentication section above. Any account
+  that ends up with `twoFactorEnabled: true` and no confirmed secret (a bad seed/migration, or a user who
+  loses their authenticator device) is permanently locked out with no self-service or `OWNER`/`HR_MANAGER`
+  recovery path today; the only fix currently available is a direct, reviewed database write (as done for the
+  three demo accounts above), not a supported product feature. A real fix would add either an
+  `OWNER`/`HR_MANAGER` "reset this user's 2FA" endpoint, or have `login()` check for a confirmed secret
+  before returning `requiresTwoFactor: true` so a half-enrolled account falls through to a normal password
+  login instead of locking out.

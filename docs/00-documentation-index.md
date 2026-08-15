@@ -64,9 +64,15 @@ you want to know *how the system is built*, read 01–18; if you want to know *h
 
 ## Cross-cutting themes (appear in multiple documents — read once, applies everywhere)
 
-- **No deployed environment exists yet.** Local development is the only environment. Every "not implemented"
-  marker for staging/production/CI/monitoring/backups traces back to this one fact, not to independent
-  oversights.
+- **Production exists now** — `api` (Render), `storefront`, and `admin` (both Netlify) are live and
+  auto-deploy on push to `main`; see [`11`](./11-deployment-and-configuration-management.md) for URLs and
+  config, [`02`](./02-system-architecture.md) for the topology. No **staging** environment exists yet, and
+  no CI pipeline gates the auto-deploy — those two gaps, plus monitoring/backups, are what the remaining
+  "not implemented" markers throughout this doc set actually refer to now, not the absence of production
+  itself. Two real production issues are open: registration OTP delivery is non-functional (no SMTP/SMS
+  provider configured — see [`07`](./07-authentication-and-authorization.md) and
+  [`13`](./13-incident-response-and-troubleshooting.md)), and the free-tier Postgres instance expires 90 days
+  after creation unless upgraded (see [`11`](./11-deployment-and-configuration-management.md)).
 - **The `tx`-passthrough transaction pattern** (`CatalogService.getByIdForAdmin()`, `EmployeesService.getById()`)
   is a real, previously-hit bug class — see [`04`](./04-backend-development.md) and `CLAUDE.md`.
 - **Ownership-scoped self-service** (wishlist, addresses, payment methods, HR self-service) is a consistently

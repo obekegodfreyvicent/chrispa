@@ -25,6 +25,25 @@ Seeded staff logins (all password `ChrisPa2026!`):
 
 Seeded customer: `sarah@example.com` (Gold-tier loyalty, `ChrisPa2026!`).
 
+**`chris`, `patricia`, and `grace` require a TOTP code, not just the password** — `seed.ts` enables 2FA for
+those three, and login will stop at a code prompt with no way to produce one until a real secret is enrolled
+(see the seed-data gap in [`03-database-design.md`](./03-database-design.md) and the Two-factor authentication
+section of [`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md)). In the live
+production database this has already been done — those three accounts have real TOTP secrets, delivered to
+the account owner directly, not written down here. `dennis` and `brenda` have 2FA off and log in with just the
+password above.
+
+## Logging into the live deployment
+
+The production URLs are `https://chrispa-storefront.netlify.app` (customer storefront) and
+`https://chrispa.netlify.app` (admin console), backed by the API at
+`https://chrispa-api.onrender.com/api/v1` — see
+[`11-deployment-and-configuration-management.md`](./11-deployment-and-configuration-management.md) for the
+full deployment configuration. **Registering a new customer account in production will not work yet** —
+neither verification code is actually delivered (see [`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md)
+and incident #2 in [`13-incident-response-and-troubleshooting.md`](./13-incident-response-and-troubleshooting.md))
+— use the seeded `sarah@example.com` account to exercise the customer experience until that's fixed.
+
 ## Granting a staff member admin console access
 
 1. `OWNER` or `HR_MANAGER` creates or already has an `Employee` record (HR → Employees).

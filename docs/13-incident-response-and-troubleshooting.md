@@ -1,7 +1,10 @@
 # 13. Incident Response and Troubleshooting
 
-Adapts template §27 (Incident Management). No incident has ever occurred against this project (there is no
-deployed environment), so this document is a procedure to have ready, not a record of practice.
+Adapts template §27 (Incident Management). A production environment now exists (see
+[`11-deployment-and-configuration-management.md`](./11-deployment-and-configuration-management.md)), and two
+real incidents from standing it up are logged below — this document is no longer purely a procedure to have
+ready, though it still describes more process (severity framing, escalation) than has actually been
+exercised under real incident pressure.
 
 ## Incident management steps (template §27, unchanged — this part of the template needs no adaptation)
 
@@ -30,17 +33,29 @@ explicit about: **do not treat the absence of alerts as evidence of health** whi
 | Admin write silently rolls back with a `NotFoundException` immediately after a transactional create | The known `getByIdForAdmin()`/`getById()` transaction-visibility gotcha — see `CLAUDE.md`'s Catalog/HR sections; the fix is passing `tx` through, not adding a retry |
 | CORS preflight fails on `PATCH`/`PUT`/`DELETE` only | Someone reverted the explicit `methods` list in `main.ts`'s `enableCors()` — Fastify's CORS plugin defaults to `GET,HEAD,POST` only |
 
-## Recommended incident severity framing (once production exists)
+## Production incident log
 
-Not yet defined — worth setting before go-live rather than during a live incident:
+| # | Symptom | Root cause | Resolution |
+|---|---|---|---|
+| 1 | First `chrispa-api` deploy built successfully but failed at startup: `Error: Cannot find module '/opt/render/project/src/apps/api/dist/main.js'` | `apps/api/tsconfig.json` has no `rootDir` pinned to `src`; because `prisma.config.ts` lives alongside `src/` under `apps/api/`, `tsc` infers the build root as `apps/api` itself, so `nest build` emits to `dist/src/main.js`, not `dist/main.js` — the same wrong path `apps/api/package.json`'s `start:prod` script assumes, never caught locally since `npm run dev:api` never runs the built output | Render's start command set to `cd apps/api && node dist/src/main.js`. **Not yet fixed at the source** — `package.json#start:prod` is still wrong; see [`11-deployment-and-configuration-management.md`](./11-deployment-and-configuration-management.md) for the proper fix (`rootDir` in `tsconfig.build.json`) |
+| 2 | A customer registered on the live storefront and never received either the email or SMS verification code, leaving their account stuck unverified with no visible error | `MailService`/`SmsService` (`apps/api/src/common/notifications/`) construct their clients at startup; when their credentials are unset (true in production as first deployed), each service logs the OTP code via `Logger.warn` instead of sending it, and `AuthService.register()` didn't treat that as a failure — the account is created, the "codes sent" response is returned, and nothing was actually delivered. Confirmed by finding the real codes in Render's log stream, already expired by the time they were found | **Resolved** — `BREVO_API_KEY`/`EMAIL_FROM_*` and `AT_USERNAME`/`AT_API_KEY` are now set on the Render service and confirmed working (see #3 and #4 below for the two further issues this uncovered). Diagnostic technique for a repeat: search Render's log stream for `not configured` or `would have sent` around the affected customer's registration time to recover the (likely expired) codes and confirm the cause |
+| 3 | Configuring real `SMTP_*` credentials (first a Gmail App Password, then Brevo's own SMTP relay) didn't fix incident #2 — every send instead hung for ~45s before failing with `Connection timeout`, identically regardless of provider | Render blocks all outbound SMTP traffic (ports 25, 465, 587) on free-tier web services, a platform policy since September 2025 (see [Render's changelog](https://render.com/changelog/free-web-services-will-no-longer-allow-outbound-traffic-to-smtp-ports)) — not a credentials, DNS, or IPv6 issue (an IPv4-pinning workaround was tried first and didn't help, since the port itself is blocked regardless of address family) | **Resolved** — `MailService` rewritten to call Brevo's transactional HTTP API (`api.brevo.com`, HTTPS/443, unaffected by the port block) instead of SMTP via `nodemailer`. Confirmed live: identical Brevo credentials that timed out over SMTP succeeded instantly over the HTTP API. Diagnostic technique for a repeat: any outbound-email integration on this Render service must use an HTTP API, never raw SMTP, unless the service is upgraded off the free plan |
+| 4 | While incident #3 was still unresolved, a registration request returned a bare `500` instead of the graceful "codes not delivered" behavior from incident #2, leaving an orphaned unverified account | `AuthService.register()` dispatched both OTP channels via `Promise.all` — fine when a provider is simply unconfigured (`OtpService` already no-ops on that), but a *real* provider error (the SMTP timeout from #3; separately, a freshly-generated Africa's Talking sandbox key briefly returning `401` before propagating) rejected the whole `Promise.all`, and nothing in the call chain caught it | **Resolved** — switched to `Promise.allSettled` with per-channel error logging in `AuthService.register()`; a delivery failure on either channel now degrades gracefully (registration still succeeds, `POST /auth/resend-otp` gives a real second chance) instead of crashing the request |
+
+## Recommended incident severity framing
+
+Still not formally defined, even though production now exists — worth setting explicitly rather than
+improvising under live-incident pressure:
 - **SEV1**: checkout or login fully unavailable, or data integrity at risk (e.g. a transaction failure that
-  could double-decrement inventory or double-pay payroll).
+  could double-decrement inventory or double-pay payroll). Incidents #2–#4 above — registration OTP delivery
+  being completely non-functional, then crashing outright — arguably belonged here by impact while open (no
+  new customer could complete signup), even though nothing looked "down" from a health-check perspective;
+  a good example of why detection can't rely on uptime monitoring alone (see below).
 - **SEV2**: a single non-critical module degraded (e.g. CMS writes failing) with a workaround available.
 - **SEV3**: cosmetic or low-traffic-path issue.
 
 Assign an owner and expected response time per severity when this is formalized — deferred here since
-setting SLAs without a production environment or on-call rotation to hold them would be aspirational rather
-than real.
+setting SLAs without an on-call rotation to hold them would be aspirational rather than real.
 
 ## Escalation
 

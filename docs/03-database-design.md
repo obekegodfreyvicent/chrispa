@@ -57,6 +57,18 @@ user's explicit freshly-given consent, and Prisma's own CLI enforces this
 (`PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`). Never assume consent carries over from earlier in a
 conversation.
 
+**Known seed-data gap — 2FA-locked demo accounts**: `seed.ts` sets `twoFactorEnabled: true` for
+`chris@chrispa.ug`, `patricia@chrispa.ug`, and `grace@chrispa.ug` but never seeds a matching
+`twoFactorSecret`, which — per [`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md) —
+permanently locks those three accounts out of login with no self-service or admin-side recovery path. A
+**fresh** seed (e.g. after `prisma migrate reset && npm run db:seed`) reproduces this lockout on any machine,
+local or production; it's not a production-specific issue, it's just easy to miss locally if an
+already-diverged `chris` row from before the `twoFactorEnabled: true` change happens to already exist (`upsert`
+won't touch it). The production database's three accounts were unlocked via a one-off bootstrap script — see
+that section for the pattern — but `seed.ts` itself still produces this locked state as-is; fixing it at the
+source (seeding a real secret, or defaulting these three to `twoFactorEnabled: false` like `dennis`/`brenda`)
+has not been done.
+
 ## Schema inventory (grouped by domain, from `schema.prisma`)
 
 | Domain | Models |

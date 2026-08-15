@@ -17,7 +17,10 @@ standard 5432/6379 (and the 5434-5439 range for Postgres). **Always check `docke
 ports are free on a new machine.**
 
 **None of the three applications (`api`, `storefront`, `admin`) are containerized** — no `Dockerfile` exists
-anywhere in the repo. They run as local Node processes today (`npm run dev:api`, etc.).
+anywhere in the repo. Locally they run as local Node processes (`npm run dev:api`, etc.); in production
+(see below) they run as **platform-native builds** on Render and Netlify, which build directly from the git
+source using their own Node buildpacks — neither platform required a `Dockerfile` to reach production, so
+containerizing the apps remains genuinely undone work, not a blocker that was quietly worked around.
 
 ## Template compliance, mapped to what exists
 
@@ -44,11 +47,19 @@ scoped as its own implementation task once a hosting target is chosen (see
 
 | Environment | Purpose | Typical access | Deployment | Status |
 |---|---|---|---|---|
-| Development | Active coding and local testing | Developers | Manual (`npm run dev:*`) + local Postgres/Redis via Compose | **Exists — the only environment today** |
+| Development | Active coding and local testing | Developers | Manual (`npm run dev:*`) + local Postgres/Redis via Compose | Exists |
 | Staging | Release validation | Developers/QA | Would be CI/CD-driven once a pipeline exists | Not implemented |
-| Production | Live services | Authorized operators | Would be CI/CD-driven once a pipeline exists | Not implemented |
+| Production | Live services | Real customers and staff | Auto-deploy on push to `main` — Render (`api`) + Netlify (`storefront`, `admin`), no CI gate in front of it | **Exists — live** (see [`11-deployment-and-configuration-management.md`](./11-deployment-and-configuration-management.md) for URLs and config) |
+
+Production went straight from "not implemented" to live with no staging step in between — there is no
+intermediate environment to validate a release against before it reaches real users. Closing that gap (a
+staging Render/Netlify environment, or at minimum a CI workflow that runs tests before the existing
+auto-deploy fires) is more valuable next work than containerizing the apps, since it addresses an actual
+live-traffic risk rather than a theoretical one.
 
 Config separation between environments is handled the same way in all three (env vars via `.env` /
-`@nestjs/config`, see [`04-backend-development.md`](./04-backend-development.md)) — no environment-specific
-code branching exists or should be added; the same build should run in every environment with only its
-configuration changing.
+`@nestjs/config` locally, platform environment settings in production — see
+[`04-backend-development.md`](./04-backend-development.md)) — no environment-specific code branching exists
+or should be added; the same build runs in every environment with only its configuration changing, which
+held true end-to-end when production was stood up (no code changes were needed to make the app "prod-ready,"
+only configuration).

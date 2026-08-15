@@ -2,7 +2,9 @@
 
 Adapts template §3 ("High-Level Architecture") to ChrisPa's actual topology.
 
-## Current architecture (local development — the only environment that exists)
+## Local development architecture
+
+(See "Production architecture," below, for the live deployment — this section documents local dev only.)
 
 ```
 Browser
@@ -27,7 +29,7 @@ The template's assumed flows (§3) map onto ChrisPa as follows:
 
 | Template flow | ChrisPa today |
 |---|---|
-| Internet / external users → DNS → Traefik → application services | Not applicable — nothing is internet-facing yet; browser talks directly to `localhost` ports |
+| Internet / external users → DNS → Traefik → application services | In local dev: not applicable, browser talks directly to `localhost` ports. **In production this flow is real**, just satisfied by Netlify/Render's own edge + managed TLS instead of a self-hosted Traefik — see "Production architecture," below |
 | Administrators → WireGuard VPN → internal services | Not applicable — admin console is served on the same network as the storefront, no private network segmentation |
 | Developers → GitLab → GitLab Runner → build/test → container image → deployment | Not applicable — no CI/CD; builds are run locally (`npm run build:*`) |
 | Applications → PostgreSQL and persistent storage | Real today — Prisma-backed Postgres, plus local disk for uploads |
@@ -83,10 +85,45 @@ Redis is running in `docker-compose.yml` and referenced in `.env.example` (`REDI
 `apps/api/src` currently uses it — it is provisioned ahead of need (e.g. for a future rate-limit store,
 session cache, or job queue), not yet load-bearing.
 
-## Target architecture (future — not built)
+## Production architecture (live today)
 
-When ChrisPa moves beyond local development, the realistic target (right-sized for a small business, not the
-template's full self-hosted stack) is:
+ChrisPa moved beyond local development onto exactly the right-sized target below — managed platforms instead
+of a self-hosted edge, no Traefik/Ansible/containers required to get there:
+
+```
+Internet
+  │
+  ├── https://chrispa-storefront.netlify.app  ──▶  Netlify: apps/storefront (Next.js build, managed TLS)
+  ├── https://chrispa.netlify.app              ──▶  Netlify: apps/admin (Next.js build, managed TLS)
+  │
+  │   both call, from the browser, via authedFetch()
+  ▼
+https://chrispa-api.onrender.com/api/v1  ──▶  Render: apps/api (Node buildpack, managed TLS)
+  │
+  ├──▶ Render Postgres "chrispa-postgres" (free plan — expires 90 days after creation unless upgraded)
+  ├──▶ Render Key Value "chrispa-redis"   (free plan, provisioned, not yet load-bearing — see below)
+  └──▶ apps/api/uploads/  (local disk on the Render instance — does not survive a redeploy; still the same
+                            gap noted in the local-dev section, now with a real consequence)
+```
+
+Full env var and build/start-command detail lives in
+[`11-deployment-and-configuration-management.md`](./11-deployment-and-configuration-management.md) — this
+section is the topology, that one is the configuration. Notably: **HTTPS/managed-cert (template §3's
+Traefik/Certbot line) is satisfied entirely by Render's and Netlify's built-in TLS**, with zero self-hosted
+reverse-proxy work — see [`17-infrastructure-platform-roadmap.md`](./17-infrastructure-platform-roadmap.md)
+§17.3 for why that trigger fired and was satisfied this way rather than by standing up Traefik.
+
+**What production does *not* yet have**, relative to the local topology above: no staging environment, no CI
+gate before deploy (see [`08-source-code-management-and-cicd.md`](./08-source-code-management-and-cicd.md)),
+no object storage for uploads (still local disk, now on an ephemeral platform instance instead of a
+developer's machine), and — the most user-visible gap — **no working outbound email/SMS**, so registration
+OTP codes are generated but never delivered (see
+[`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md)).
+
+## Target architecture (further out — not built)
+
+Beyond the managed-platform setup above, a fuller self-hosted-style target (only worth it past a scale where
+managed-platform pricing or control limitations start to bind) would look like:
 
 ```
 Internet
