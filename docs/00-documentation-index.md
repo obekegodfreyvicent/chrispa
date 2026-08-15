@@ -163,6 +163,16 @@ them blindly during a stale-looking review.
   customers to `/orders/undefined` and a false "Order not found" after every successful Cash-on-Delivery
   order. The order itself was always placed correctly — see
   [`13`](./13-incident-response-and-troubleshooting.md) incident #6.
+- **Driver App** (commit `75b7cff`, per user request, not in the original SRS) — a new `DRIVER` staff role,
+  `Delivery` model (1:1 with `Order`, GPS pickup/delivery capture + timestamps, deep-linked to Google Maps
+  rather than an in-app map), and an admin-console "My Deliveries" section for drivers. Backend is fully live
+  in production (migrated and verified); the admin/storefront UI pieces (assign-driver, delivery status on
+  the order/receipt views, My Deliveries) are code-complete but blocked from reaching the live sites by the
+  still-open Netlify issue above. See [`03`](./03-database-design.md), [`07`](./07-authentication-and-authorization.md),
+  and [`16`](./16-user-and-administrator-procedures.md) for the model, RBAC, and usage walkthrough
+  respectively — [`21`](./21-data-flow-diagram.md), [`22`](./22-entity-relationship-diagram.md), and
+  [`23`](./23-data-dictionary.md) predate this feature and have not been regenerated (their `.docx` files were
+  open in a desktop word processor at the time — see the note on those three documents' own freshness dates).
 - **Three near-term priorities** stand out across this whole set as worth doing before the rest: push the
   repo to a remote, add database backups, and wire forgot-password/login-alert/staff-temp-password delivery
   to the email+SMS services (registration OTP already uses real Brevo (HTTP API, not SMTP — see

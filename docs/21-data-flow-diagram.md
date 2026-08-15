@@ -221,6 +221,65 @@ see the Registration & OTP diagram below for where they sit.
 - `deliveryConfirmedAt` is a separate, customer-only signal from staff-set `status: DELIVERED` — the
   "mutual consent" the printable receipt requires.
 
+## Level 1 — Driver App: Assignment & Delivery Tracking
+
+Added after this document's original freshness date (commit `75b7cff`, per user request, not in the original
+SRS) — see [`00-documentation-index.md`](./00-documentation-index.md)'s cross-cutting note on why this
+section postdates the rest of the document.
+
+```
+ ┌──────────┐  1. assign(driverId)             ┌───────────────────┐
+ │  Admin    ├─────────────────────────────────>│ 1.0 Delivery       │
+ │ (Owner /  │                                  │ Service.assign()   │
+ │ StoreMgr/ │<──────── delivery + driver ────── └──┬──────────┬─────┘
+ │ Fulfillm.)│                                      │2. upsert │3. write
+ └──────────┘                                       v          v
+                                              ╔═══════════╗ ╔═══════════╗
+                                              ║ Delivery  ║ ║ActivityLog║
+                                              ╚═══════════╝ ╚═══════════╝
+```
+
+```
+ ┌──────────┐ 4. status(EN_ROUTE_TO_PICKUP,    ┌───────────────────┐
+ │  Driver   ├──PICKED_UP+gps, EN_ROUTE_TO──────>│ 4.0 Delivery       │
+ │ (own      │  CUSTOMER, DELIVERED+gps)         │ Service             │
+ │ deliveries│<────────── updated delivery ────── │ .updateStatus()    │
+ │ only)     │                                    └──┬─────────┬──────┘
+ └──────────┘                          5. write       │         │6. mirror onto
+                                        Delivery       │         │  Order.status
+                                        (GPS+timestamp │         │  (reuses 6.0
+                                        at pickup/      v         │  Update Order
+                                        delivery)  ╔═══════════╗  │  Status, see
+                                                    ║ Delivery  ║  │  Checkout &
+                                                    ╚═══════════╝  │  Order
+                                                                    │  Processing
+                                                                    v  above)
+                                                            ╔═══════════╗
+                                                            ║   Order   ║
+                                                            ╚═══════════╝
+```
+
+- **Assignment** (`PATCH /admin/orders/:id/assign-driver`, `OWNER`/`STORE_MANAGER`/`FULFILLMENT` — same RBAC
+  boundary as order management, not a separate permission): upserts a `Delivery` row 1:1 with the `Order`.
+  Reassigning an in-progress delivery resets its own lifecycle back to `ASSIGNED` (pickup/delivery snapshots
+  cleared) but never moves `Order.status` backward.
+- **Driver status updates** (`PATCH /driver/deliveries/:id/status`, `DRIVER` only, ownership-checked to the
+  caller's own assigned deliveries): `ASSIGNED → EN_ROUTE_TO_PICKUP → PICKED_UP → EN_ROUTE_TO_CUSTOMER →
+  DELIVERED`, or `FAILED` from any in-progress state. `PICKED_UP`/`DELIVERED` require GPS coordinates
+  (captured via the browser's `navigator.geolocation`, per user decision — deep-link to Google Maps for
+  actual turn-by-turn directions rather than an in-app map/routing SDK) and snapshot them plus a timestamp.
+- **Mirrored onto `Order.status`**: `PICKED_UP` → `SHIPPED`, `DELIVERED` → `DELIVERED`, by calling
+  `OrdersService.updateStatus()` directly (step 6.0 above is the same process box as the Checkout & Order
+  Processing diagram's staff-triggered transition) — stepping through `PROCESSING` first if the order hadn't
+  already been moved there, so a driver being assigned before staff has processed the order is a normal
+  sequencing, not an error. This is why a `DELIVERED` delivery also triggers revenue recognition exactly as
+  a staff-triggered `DELIVERED` transition would — it's literally the same code path.
+- A separate, lower-frequency flow (not diagrammed): `PATCH /driver/deliveries/:id/location` writes a single
+  last-known-position snapshot (`currentLat`/`currentLng`/`lastLocationAt`, overwritten each call) — a manual
+  "share my current location" action, not continuous background tracking.
+- Both the customer's and staff's printable receipt (see Checkout & Order Processing above) read `Delivery`
+  via `Order.delivery` to show driver name, pickup time+location, and delivery time+location.
+
 ## Level 1 — Inventory (read side)
 
 ```

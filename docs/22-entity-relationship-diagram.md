@@ -75,6 +75,8 @@ actually read.
 | Order | LoyaltyLedgerEntry | orderId | 1:N | not set | optional |
 | Order | SupportTicket | orderId | 1:N | not set | optional |
 | Order | PaymentTransaction | orderId | 1:N | not set | optional — a Flutterwave charge can be initiated before the order is confirmed to exist |
+| Order | Delivery | orderId | 1:1 | not set | added commit `75b7cff` (Driver App, not in original SRS) — `orderId @unique`, one delivery assignment per order, no split-shipment support |
+| User | Delivery | driverId | 1:N | not set | added commit `75b7cff` — the driver; relation named `DriverDeliveries` in schema.prisma to disambiguate from `Order.user` |
 | LoyaltyAccount | LoyaltyLedgerEntry | loyaltyAccountId | 1:N | Cascade | |
 | SupportTicket | TicketMessage | ticketId | 1:N | Cascade | |
 | Vendor | VendorPayout | vendorId | 1:N | not set | |
@@ -130,6 +132,11 @@ actually read.
   the archive-instead-of-delete convention (`ProductStatus.ARCHIVED`) in `CatalogService`.
 - **`Employee` is soft-terminated, never hard-deleted** — same reasoning, `employmentStatus: TERMINATED`
   plus an `EmploymentHistoryEntry` audit row, never a real `DELETE`.
+- **`Delivery` is 1:1 with `Order`, reassignable, not append-only** (added commit `75b7cff`, Driver App, not
+  in original SRS) — assigning a driver to an order that already has one `upsert`s the existing row rather
+  than creating a second, clearing its pickup/delivery snapshots and resetting `status` to `ASSIGNED`; there
+  is no history of prior driver assignments once reassigned. `currentLat`/`currentLng`/`lastLocationAt` are
+  likewise a single overwritten snapshot, not a location-history table.
 - **`Bundle.productIds`** is a scalar `String[]` of Product IDs, not a join table — no referential integrity
   (a deleted/archived product ID can linger in a bundle's array unnoticed); a deliberate simplification, not
   an oversight, per the schema's own comment.
@@ -197,13 +204,15 @@ actually read.
    │(optional) │      │<─N:1─    │      └──────────┘         Vendor (optional),
    └──────────┘      │Warehouse │                            VendorPayout (optional)
                       └────┬─────┘
-                 1:N ┌─────┴─────┐ 1:N
-                     v            v
-              ┌────────────┐ ┌──────────────┐
-              │SupportTicket│ │LoyaltyLedger │
+                 1:N ┌─────┼─────┐ 1:N          1:1 ┌──────────┐ N:1 ┌──────────┐
+                     v     │     v ─────────────────>│ Delivery ├─────> User      │
+              ┌────────────┐ ┌──────────────┐        └──────────┘     │(driver)  │
+              │SupportTicket│ │LoyaltyLedger │                        └──────────┘
               └────────────┘ │Entry          │
                               └──────────────┘
 ```
+
+`Delivery` added commit `75b7cff` (Driver App, not in original SRS) — see the Non-obvious rules note above.
 
 ### Marketplace & payments
 

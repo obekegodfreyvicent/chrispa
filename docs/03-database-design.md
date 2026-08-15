@@ -78,6 +78,13 @@ admin-triggered account hold, distinct from the existing terminal `deletedAt` �
 [`22-entity-relationship-diagram.md`](./22-entity-relationship-diagram.md) for exactly how it and `deletedAt`
 interact with `AuthService.completeLogin()`/`refresh()`.
 
+**`UserRole.DRIVER`** (added this session, commit `75b7cff` — Driver App, per user request, not in the
+original SRS): a staff login like any other (created via the same HR employee-login flow, now including
+`DRIVER` in `STAFF_ROLES`), scoped to their own assigned `Delivery` rows only. See
+[`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md) for the RBAC boundary and
+[`16-user-and-administrator-procedures.md`](./16-user-and-administrator-procedures.md) for how an admin
+assigns a driver and how a driver works a delivery.
+
 ## Schema inventory (grouped by domain, from `schema.prisma`)
 
 | Domain | Models |
@@ -87,6 +94,7 @@ interact with `AuthService.completeLogin()`/`refresh()`.
 | Catalog | `ProductLine`, `WellnessTag`, `Product` (now with optional `vendorId`/`costUgx`), `ProductWellnessTag`, `ProductMedia`, `Variant` |
 | Inventory | `Warehouse`, `InventoryRecord` |
 | Cart & checkout | `Cart`, `CartItem`, `Order` (now with `vatUgx`, `deliveryConfirmedAt`), `OrderItem` (now with `vendorId`/`costUgxSnapshot`/`platformCommissionUgx`/`vendorPayoutUgx`/`vendorPayoutId`) |
+| Delivery (Driver App) | `Delivery` — 1:1 with `Order`, driver assignment + GPS pickup/delivery tracking, not in the original SRS (per user request, see [`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md) for the new `DRIVER` role and [`16-user-and-administrator-procedures.md`](./16-user-and-administrator-procedures.md) for how it's used) |
 | Marketplace | `Vendor`, `VendorPayout` — see below |
 | Payments | `PaymentTransaction` — see below |
 | Marketing | `Coupon`, `Bundle`, `NewsletterSubscriber` (FR-26.4 — footer email capture, not tied to `User`), `NewsletterCampaign` (one row per admin "Compose Newsletter" send) |

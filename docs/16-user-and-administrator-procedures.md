@@ -56,6 +56,10 @@ and incident #2 in [`13-incident-response-and-troubleshooting.md`](./13-incident
    other admin action is allowed.
 5. Only an `OWNER` can grant the `OWNER` role — `HR_MANAGER` will be rejected with a `ForbiddenException` if
    it tries.
+6. This is also how a **driver** account is created (`loginRole: 'DRIVER'`) — no separate onboarding flow for
+   the Driver App (per user request, not in the original SRS; see
+   [`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md)). See "Assigning and
+   tracking deliveries" below for what happens after.
 
 ## Revoking access
 
@@ -96,6 +100,48 @@ just hasn't been wired to them. Until that exists, a forgotten staff password mu
 | Assign a vendor / set cost basis on a product | Admin → Products (Add/Edit Product form) | `OWNER`, `STORE_MANAGER` |
 | Print/view an order's receipt | Admin → Orders → an order → View / Print Receipt | `OWNER`, `STORE_MANAGER`, `FULFILLMENT` |
 | Review/respond to a support ticket, change its status | Admin → Support Tickets | `OWNER`, `STORE_MANAGER`, `SUPPORT_AGENT` |
+| Assign/reassign a driver to an order | Admin → Orders → an order → Delivery / Driver | `OWNER`, `STORE_MANAGER`, `FULFILLMENT` |
+| Work an assigned delivery (pickup/delivery, GPS) | Admin → My Deliveries | `DRIVER` (own assigned deliveries only) |
+
+## Assigning and tracking deliveries (Driver App)
+
+Added this session (commit `75b7cff`), per user request — not in the original SRS. Scoped deliberately lean:
+the driver app is a section inside the existing admin console (not a separate application), and "GPS
+navigation" means capturing coordinates + deep-linking to Google Maps, not an in-app map/routing engine — see
+[`17-infrastructure-platform-roadmap.md`](./17-infrastructure-platform-roadmap.md) if a fuller in-app map is
+ever reconsidered.
+
+**Admin side**:
+1. Create a driver account via the normal staff-login flow above (`loginRole: 'DRIVER'`).
+2. Open the order in Admin → Orders → an order, and use the **Delivery / Driver** card to assign (or
+   reassign) a driver from the dropdown. Reassigning an in-progress delivery restarts its own status
+   lifecycle (back to `ASSIGNED`) — it does **not** move `Order.status` backward.
+3. Watch the same card for live status, pickup/delivery timestamps, and Google Maps links as the driver
+   works the delivery — no separate "track a driver" page, it's on the order itself.
+4. Both the admin and customer printable receipts (View / Print Receipt) show the driver's name, pickup
+   time+location, and delivery time+location once set — this was the actual point of the request ("all
+   information in a driver app should appear in receipt for both customer and admin").
+
+**Driver side** (Admin → My Deliveries, only visible/usable by `DRIVER`-role accounts):
+1. See assigned deliveries, grouped Active / Completed.
+2. Open one to see the pickup location (warehouse) and delivery destination (customer address), each with a
+   "Open in Google Maps" link for actual turn-by-turn directions.
+3. Advance through the lifecycle with one button at a time: *heading to pickup → picked up → heading to
+   customer → delivered*. The **picked up** and **delivered** steps require sharing the browser's current
+   location (`navigator.geolocation`) — the button is blocked with a clear error if location access is
+   denied, since those two moments are exactly what gets snapshotted onto the receipt.
+4. A "Share my current location" button is available while en route, for a manual live-position update — not
+   automatic/continuous tracking (no background-location permission is requested; that would need a native
+   app, not a browser tab).
+5. "Report a problem / mark as failed" is available from any in-progress state, for a delivery attempt that
+   couldn't be completed (customer unreachable, refused, etc.) — terminal, same as `DELIVERED`, no further
+   transitions.
+
+Marking **picked up** auto-advances `Order.status` to `SHIPPED` and **delivered** to `DELIVERED` (stepping
+through `PROCESSING` first if staff hadn't already moved it there — a driver being assigned before an order
+leaves `PENDING` is normal, not an error). This reuses the exact same `OrdersService.updateStatus()` staff
+already use from the Orders page, so revenue recognition and the rest of the order pipeline behave
+identically regardless of whether a driver or a staff member triggered the transition.
 
 ## Customer receipts require the customer's own confirmation first
 

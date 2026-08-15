@@ -140,7 +140,7 @@ hardware-key login, not a placeholder.
 
 ## RBAC
 
-- `UserRole` enum: `OWNER`, `STORE_MANAGER`, `FULFILLMENT`, `SUPPORT_AGENT`, `HR_MANAGER`, `CUSTOMER`.
+- `UserRole` enum: `OWNER`, `STORE_MANAGER`, `FULFILLMENT`, `SUPPORT_AGENT`, `HR_MANAGER`, `DRIVER`, `CUSTOMER`.
 - Enforced by `JwtAuthGuard` (authentication — verifies the JWT signature) and `RolesGuard` + `@Roles()`
   (authorization — gates `/admin/*` and `/hr/*` routes). This guard pair is the **real security boundary**
   everywhere in the API.
@@ -151,6 +151,19 @@ hardware-key login, not a placeholder.
   'SUPPORT_AGENT')` at `/admin/support/tickets` is its first real consumer. The admin console mirrors this: a
   `SUPPORT_AGENT` sees only **Support Tickets** plus **My HR** in the sidenav (`visibleSections()` in
   `admin-shell.tsx`), the smallest nav footprint of any staff role.
+- **`DRIVER`** (added this session, commit `75b7cff` — Driver App, per user request, not in the original SRS):
+  a staff login created the same way as every other role (added to `STAFF_ROLES` in
+  `hr/dto/create-login.dto.ts`, so it goes through the normal Employee + `createLoginInternal()` flow — temp
+  password, `mustChangePassword`, no separate onboarding path). Scoped narrowly: `MyDeliveriesController`
+  (`/driver/deliveries/*`) is `@Roles('DRIVER')` and every method is additionally ownership-checked
+  (`findFirst({ id, driverId })`) so a driver only ever sees their own assigned `Delivery` rows, same pattern
+  as the customer self-service modules (wishlist/addresses/payment-methods). Assigning a driver to an order
+  (`PATCH /admin/orders/:id/assign-driver`) is gated the same as order management itself —
+  `@Roles('OWNER', 'STORE_MANAGER', 'FULFILLMENT')` — not a `DRIVER` permission. The admin console mirrors
+  this: a `DRIVER` sees only **My Deliveries** plus **My HR** in the sidenav, the same "own section + My HR"
+  shape `SUPPORT_AGENT` gets above. See [`16-user-and-administrator-procedures.md`](./16-user-and-administrator-procedures.md)
+  for the actual assign/pickup/deliver walkthrough and [`22-entity-relationship-diagram.md`](./22-entity-relationship-diagram.md)
+  for `Delivery`'s relationship to `Order`/`User`.
 
 ## Forced password reset for staff-issued logins
 

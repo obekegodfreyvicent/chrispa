@@ -290,6 +290,31 @@ Join table. Composite PK `(productId, wellnessTagId)`, both Cascade.
 
 ---
 
+## Delivery (Driver App)
+
+Added commit `75b7cff`, per user request — not in the original SRS. See
+[`21-data-flow-diagram.md`](./21-data-flow-diagram.md)'s Driver App diagram and
+[`22-entity-relationship-diagram.md`](./22-entity-relationship-diagram.md) for the relationship/reassignment
+semantics.
+
+### Delivery
+
+| Field | Type | Nullable | Default | Notes |
+|---|---|---|---|---|
+| orderId | String | No | — | FK → Order, `@unique` — 1:1, no split-shipment support |
+| driverId | String | No | — | FK → User (relation `DriverDeliveries`); the assigned driver, must have `role: DRIVER` |
+| status | DeliveryStatus | No | ASSIGNED | See the `DeliveryStatus` enum below |
+| pickupLat / pickupLng | Float | Yes | — | Snapshotted from the driver's browser geolocation at the moment `status` becomes `PICKED_UP` |
+| pickedUpAt | DateTime | Yes | — | Set alongside pickupLat/pickupLng |
+| deliveryLat / deliveryLng | Float | Yes | — | Snapshotted at `DELIVERED`, same reasoning as pickup |
+| deliveredAt | DateTime | Yes | — | Set alongside deliveryLat/deliveryLng |
+| currentLat / currentLng | Float | Yes | — | Last-known position while en route — a single overwritten snapshot, not a location-history table |
+| lastLocationAt | DateTime | Yes | — | Timestamp of the last position update |
+| notes | String | Yes | — | |
+| assignedAt | DateTime | No | now() | |
+| createdAt / updatedAt | DateTime | No | now() / auto | |
+| — | — | — | — | `@@index([driverId])`, `@@index([status])` |
+
 ## Marketplace
 
 ### Vendor
@@ -870,7 +895,7 @@ treated as its own domain in `03-database-design.md`'s inventory table.
 
 | Enum | Values | Purpose |
 |---|---|---|
-| UserRole | CUSTOMER, OWNER, STORE_MANAGER, FULFILLMENT, SUPPORT_AGENT, HR_MANAGER | Access-control role, staff + customer |
+| UserRole | CUSTOMER, OWNER, STORE_MANAGER, FULFILLMENT, SUPPORT_AGENT, HR_MANAGER, DRIVER | Access-control role, staff + customer. `DRIVER` added commit `75b7cff` (Driver App, not in original SRS) |
 | CustomerTier | STANDARD, GOLD, WHOLESALE | Loyalty/pricing tier |
 | NotificationType | NEWSLETTER | In-app notification discriminator |
 | OtpChannel | EMAIL, SMS | Registration OTP delivery channel |
@@ -879,6 +904,7 @@ treated as its own domain in `03-database-design.md`'s inventory table.
 | PaymentMethodType | MOBILE_MONEY, CARD, PAYPAL | Only MOBILE_MONEY fully supported |
 | ProductStatus | DRAFT, ACTIVE, ARCHIVED | ARCHIVED replaces hard-delete once order history exists |
 | OrderStatus | PENDING, PROCESSING, SHIPPED, DELIVERED, REFUND_REQUESTED, REFUNDED, CANCELLED | Governed by an explicit transition state machine |
+| DeliveryStatus | ASSIGNED, EN_ROUTE_TO_PICKUP, PICKED_UP, EN_ROUTE_TO_CUSTOMER, DELIVERED, FAILED | Driver App (commit `75b7cff`, not in original SRS) — `PICKED_UP`/`DELIVERED` mirror onto `Order.status` (SHIPPED/DELIVERED respectively); `FAILED` reachable from any in-progress state, terminal like `DELIVERED` |
 | DeliveryMethod | STANDARD, EXPRESS, SAME_DAY | |
 | CouponType | PERCENT_OFF, FIXED_OFF, FREE_SHIPPING | |
 | TicketStatus | OPEN, IN_PROGRESS, RESOLVED, CLOSED | |
