@@ -2,5 +2,10 @@
   command = "npm run build --workspace apps/admin"
   publish = ".next"
 
+[build.environment]
+  # Next.js 16 requires Node >= 20.9 — pin explicitly since Netlify's
+  # default build image predates this.
+  NODE_VERSION = "22"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
