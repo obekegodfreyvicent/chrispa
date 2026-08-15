@@ -118,6 +118,13 @@ export class AccountSettingsService {
       throw new UnauthorizedException('Current password is incorrect');
     }
 
+    return this.anonymizeUser(userId);
+  }
+
+  // Shared with CrmService.remove() (admin-triggered delete) — the scrub is
+  // identical either way, only the proof-of-authority differs (the
+  // customer's own password above vs. admin auth + RBAC on the CRM side).
+  async anonymizeUser(userId: string) {
     await this.prisma.$transaction([
       this.prisma.address.deleteMany({ where: { userId } }),
       this.prisma.paymentMethod.deleteMany({ where: { userId } }),

@@ -97,6 +97,16 @@ model User {
   // account or linked onto an existing email match. Null for every
   // password-only account.
   googleId            String?      @unique
+  // Admin-triggered, reversible account hold (see CrmService.suspend()) —
+  // distinct from deletedAt below, which is terminal. A suspended account
+  // keeps all its data untouched and can be reactivated; completeLogin()
+  // blocks token issuance while this is set, same enforcement point every
+  // login path (password, 2FA, Google, WebAuthn) already funnels through.
+  // A single nullable timestamp rather than a full status enum (contrast
+  // Employee's EmploymentStatus/SUSPENDED) since User has no equivalent of
+  // ON_LEAVE — just active, suspended, or deleted.
+  suspendedAt         DateTime?    @db.Timestamptz(3)
+  suspensionReason    String?
   // FR-17.4 Delete Account — same "never hard-delete" convention as Order
   // and Employee, for the same reason (financial/legal retention). The row
   // survives with PII scrubbed (see AccountSettingsService.deleteAccount());

@@ -274,10 +274,23 @@ export class AuthService {
   // Shared tail end of every path that actually completes a login (password,
   // 2FA-verified, WebAuthn — but deliberately NOT refresh(), which isn't a
   // new login, just silent token renewal for an already-established session).
+  // The single enforcement point for suspendedAt (see CrmService.suspend())
+  // — every login path funnels through here, so this is checked once rather
+  // than duplicated in login()/verifyTwoFactorLogin()/verifyOtp()/
+  // googleLogin(). deletedAt is checked too for defense in depth, though a
+  // self-deleted account already can't reach here via the password path
+  // (deleteAccount() also nulls passwordHash) — this covers any path that
+  // looks a user up by id rather than by credential.
   async completeLogin(
-    user: { id: string; role: string; tier: string; mustChangePassword: boolean },
+    user: { id: string; role: string; tier: string; mustChangePassword: boolean; suspendedAt?: Date | null; deletedAt?: Date | null },
     context: LoginContext,
   ) {
+    if (user.deletedAt) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    if (user.suspendedAt) {
+      throw new UnauthorizedException('This account has been suspended. Contact support for help.');
+    }
     await this.recordLoginEvent(user.id, context);
     await this.activityLog.record({
       actorUserId: user.id,
@@ -349,6 +362,14 @@ export class AuthService {
     }
 
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: payload.sub } });
+    if (user.deletedAt || user.suspendedAt) {
+      // Same check as completeLogin(), needed separately here since refresh()
+      // deliberately doesn't go through it (see the comment there) — without
+      // this, CrmService.suspend()'s revoke-all-refresh-tokens step would be
+      // the only thing stopping an already-issued refresh token from just
+      // minting a fresh access token for a suspended account.
+      throw new UnauthorizedException('This account has been suspended. Contact support for help.');
+    }
     await this.prisma.refreshToken.update({
       where: { id: match.id },
       data: { revokedAt: new Date() },
