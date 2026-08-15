@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ChrisPa Scents &amp; Soaps — My Account Wireframes</title>
+<style>
+
+  :root{
+    --bg:#FFFFFF;
+    --surface:#F5F9F1;
+    --surface-2:#E7F0DF;
+    --gold:#1B5E20;
+    --gold-light:#3F7D32;
+    --gold-dark:#8C6836;
+    --text:#16281A;
+    --text-2:#5E7358;
+    --danger:#FF4444;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:'Segoe UI',ui-sans-serif,Helvetica,Arial,sans-serif;}
+
+  .app{display:flex;min-height:100vh;}
+  .sidenav{
+    width:230px;flex:none;background:var(--surface);
+    border-right:1px solid var(--surface-2);
+    display:flex;flex-direction:column;
+    position:sticky;top:0;height:100vh;overflow-y:auto;
+  }
+  .brand{
+    padding:20px 16px 14px;border-bottom:1px solid var(--surface-2);
+    display:flex;align-items:center;gap:10px;
+  }
+  .mark{width:34px;height:34px;flex:none;}
+  .brand-txt{line-height:1.1;}
+  .brand-txt .name{font-family:Georgia,serif;font-style:italic;color:var(--gold-light);font-size:14.5px;}
+  .brand-txt .tag{font-size:8.5px;letter-spacing:.18em;color:var(--text-2);}
+
+  .nav-group{padding:14px 10px 4px;}
+  .nav-group-label{
+    font-size:10px;letter-spacing:.14em;color:var(--gold-dark);
+    padding:6px 10px;text-transform:uppercase;
+  }
+  .nav-btn{
+    display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+    background:none;border:none;color:var(--text-2);padding:9px 10px;
+    border-radius:8px;font-size:12.3px;cursor:pointer;margin:1px 0;
+  }
+  .nav-btn:hover{background:var(--surface-2);color:var(--text);}
+  .nav-btn.active{background:var(--surface-2);color:var(--gold-light);border-left:2px solid var(--gold);}
+  .nav-icon{width:16px;text-align:center;font-size:12px;opacity:.85;}
+
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .topbar{
+    height:56px;flex:none;border-bottom:1px solid var(--surface-2);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 22px;background:linear-gradient(180deg,#F7FAF4,#FFFFFF);
+  }
+  .crumb{font-size:11.5px;color:var(--text-2);}
+  .crumb b{color:var(--gold-light);font-weight:600;}
+  .wf-badge{
+    font-size:9.5px;letter-spacing:.1em;color:var(--gold-dark);
+    border:1px solid var(--gold-dark);padding:3px 8px;border-radius:20px;
+  }
+  .canvas{padding:26px;overflow:auto;}
+  .page{display:none;}
+  .page.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  h1.pt{font-family:Georgia,serif;font-size:22px;margin:0 0 3px;color:var(--text);}
+  .pt-sub{font-size:12px;color:var(--text-2);margin:0 0 20px;}
+
+  .card{
+    background:var(--surface);border:1px solid var(--surface-2);
+    border-radius:var(--radius);padding:16px;
+  }
+  .ph-img{
+    background:repeating-linear-gradient(45deg,#EFF5EA,#EFF5EA 8px,#E4EEDD 8px,#E4EEDD 16px);
+    border:1px dashed #B7CDAC;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--text-2);font-size:10.5px;letter-spacing:.05em;
+  }
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    padding:9px 16px;border-radius:7px;font-size:12px;font-weight:600;
+    border:1px solid transparent;cursor:default;white-space:nowrap;
+  }
+  .btn-gold{background:var(--gold);color:#FFFFFF;}
+  .btn-gold-outline{background:transparent;border-color:var(--gold-dark);color:var(--gold-light);}
+  .btn-ghost{background:var(--surface-2);color:var(--text);}
+  .btn-danger{background:transparent;border-color:var(--danger);color:var(--danger);}
+  .btn-social{background:var(--surface-2);color:var(--text);border-color:#CBDCC1;}
+  .chip{
+    font-size:10px;padding:3px 9px;border-radius:20px;background:var(--surface-2);
+    color:var(--text-2);border:1px solid #CBDCC1;
+  }
+  .chip.gold{color:var(--gold-light);border-color:var(--gold-dark);}
+  .field{
+    background:#FFFFFF;border:1px solid #CBDCC1;border-radius:7px;
+    padding:9px 11px;font-size:11.5px;color:var(--text-2);
+  }
+  .field.focus{border-color:var(--gold);color:var(--text);}
+  .label{font-size:10px;color:var(--text-2);letter-spacing:.05em;margin-bottom:5px;display:block;text-transform:uppercase;}
+  .divider{height:1px;background:var(--surface-2);margin:16px 0;}
+  .grid{display:grid;gap:16px;}
+  .g2{grid-template-columns:1fr 1fr;}
+  .g3{grid-template-columns:repeat(3,1fr);}
+  .g4{grid-template-columns:repeat(4,1fr);}
+  .flex{display:flex;}
+  .between{justify-content:space-between;}
+  .center-v{align-items:center;}
+  .gap8{gap:8px;} .gap10{gap:10px;} .gap14{gap:14px;} .gap20{gap:20px;}
+  .muted{color:var(--text-2);}
+  .gold-txt{color:var(--gold-light);}
+  small.note{font-size:10px;color:var(--text-2);}
+  table{width:100%;border-collapse:collapse;font-size:11.5px;}
+  th{
+    text-align:left;color:var(--gold-dark);font-size:10px;letter-spacing:.08em;
+    text-transform:uppercase;padding:9px 10px;border-bottom:1px solid var(--surface-2);
+  }
+  td{padding:10px 10px;border-bottom:1px solid #E3EDDB;color:var(--text);}
+  tr:hover td{background:#EFF5EA;}
+  .status{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:600;}
+  .status.ok{background:rgba(63,125,50,.14);color:var(--gold-light);}
+  .status.pending{background:#E7F0DF;color:var(--text-2);}
+  .status.danger{background:rgba(255,68,68,.12);color:var(--danger);}
+  .kpi{padding:16px;}
+  .kpi .val{font-family:Georgia,serif;font-size:24px;color:var(--text);}
+  .kpi .delta{font-size:10.5px;color:var(--gold-light);}
+  .annot{
+    font-size:9.5px;color:var(--gold-dark);border-left:2px solid var(--gold-dark);
+    padding-left:8px;margin:10px 0;
+  }
+  .auth-shell{max-width:420px;margin:10px auto 0;}
+  .auth-card{padding:30px 28px;}
+  .auth-logo{display:flex;flex-direction:column;align-items:center;margin-bottom:18px;}
+  .auth-logo svg{width:46px;height:46px;}
+  .auth-logo .name{font-family:Georgia,serif;font-style:italic;color:var(--gold-light);font-size:16px;margin-top:8px;}
+  .auth-logo .tag{font-size:8px;letter-spacing:.2em;color:var(--text-2);}
+  .toggle{
+    display:flex;background:#FFFFFF;border:1px solid #CBDCC1;border-radius:8px;padding:3px;margin-bottom:16px;
+  }
+  .toggle span{flex:1;text-align:center;padding:7px 0;font-size:11.5px;border-radius:6px;color:var(--text-2);}
+  .toggle span.active{background:var(--gold);color:#FFFFFF;font-weight:600;}
+  .otp-boxes{display:flex;gap:8px;justify-content:center;margin:14px 0;}
+  .otp-boxes div{width:40px;height:48px;background:#FFFFFF;border:1px solid #CBDCC1;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--gold-light);}
+  .avatar{
+    width:64px;height:64px;border-radius:50%;background:var(--surface-2);border:2px solid var(--gold-dark);
+    display:flex;align-items:center;justify-content:center;color:var(--text-2);font-size:10px;
+  }
+  .switch{width:34px;height:18px;border-radius:20px;background:#CBDCC1;position:relative;display:inline-block;}
+  .switch.on{background:var(--gold-dark);}
+  .switch .dot{width:14px;height:14px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;}
+  .switch.on .dot{left:18px;background:#FFFFFF;}
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;
+  }
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:#E7F0DF;border-radius:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="sidenav">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#1B5E20" stroke-width="3"/>
+        <text x="50" y="63" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="46" fill="#3F7D32">C</text>
+      </svg>
+      <div class="brand-txt">
+        <div class="name">ChrisPa Scents &amp; Soaps</div>
+        <div class="tag">BEYOND CRYSTALS</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">My Account</div>
+      <button class="nav-btn active" data-page="overview"><span class="nav-icon">☺</span>Overview</button>
+      <button class="nav-btn" data-page="profile"><span class="nav-icon">✎</span>Profile & Photo</button>
+      <button class="nav-btn" data-page="addresses"><span class="nav-icon">⌂</span>Address Book</button>
+      <button class="nav-btn" data-page="orders"><span class="nav-icon">▤</span>Order History</button>
+      <button class="nav-btn" data-page="wishlist"><span class="nav-icon">♡</span>Wishlist</button>
+      <button class="nav-btn" data-page="payments"><span class="nav-icon">▭</span>Saved Payments</button>
+      <button class="nav-btn" data-page="settings"><span class="nav-icon">⚙</span>Settings & Notifications</button>
+      <button class="nav-btn" data-page="loyalty"><span class="nav-icon">★</span>Loyalty & Rewards</button>
+      <button class="nav-btn" data-page="social"><span class="nav-icon">◎</span>Connected & Social</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb" id="crumb">My Account &nbsp;/&nbsp; <b>Overview</b></div>
+      <div class="wf-badge">FEATURE · MY ACCOUNT</div>
+    </div>
+    <div class="canvas" id="canvas">
+<div class="page active" id="page-overview">
+        <h1 class="pt">Account Overview</h1>
+        <p class="pt-sub">Central hub linking every account sub-feature</p>
+        <div class="card flex gap14 center-v">
+          <div class="avatar">Photo</div>
+          <div>
+            <div style="font-size:15px;">Sarah Nakato</div>
+            <small class="note">sarah@email.com · Gold Member since 2024</small>
+          </div>
+          <div style="margin-left:auto;"><button class="btn btn-gold-outline">Edit Profile</button></div>
+        </div>
+        <div class="grid g4" style="margin-top:16px;">
+          <div class="card kpi"><div class="label">Loyalty Points</div><div class="val">1,240</div><div class="delta">Gold Tier</div></div>
+          <div class="card kpi"><div class="label">Open Orders</div><div class="val">2</div><div class="delta">1 shipped</div></div>
+          <div class="card kpi"><div class="label">Wishlist</div><div class="val">7</div><div class="delta">items saved</div></div>
+          <div class="card kpi"><div class="label">Saved Addresses</div><div class="val">3</div><div class="delta">2 default</div></div>
+        </div>
+        <div class="annot">Quick links to every account area</div>
+        <div class="grid g4">
+          <div class="card" style="text-align:center;">✎<div style="font-size:11.5px;margin-top:6px;">Profile</div></div>
+          <div class="card" style="text-align:center;">⌂<div style="font-size:11.5px;margin-top:6px;">Addresses</div></div>
+          <div class="card" style="text-align:center;">▤<div style="font-size:11.5px;margin-top:6px;">Orders</div></div>
+          <div class="card" style="text-align:center;">♡<div style="font-size:11.5px;margin-top:6px;">Wishlist</div></div>
+          <div class="card" style="text-align:center;">▭<div style="font-size:11.5px;margin-top:6px;">Payments</div></div>
+          <div class="card" style="text-align:center;">⚙<div style="font-size:11.5px;margin-top:6px;">Settings</div></div>
+          <div class="card" style="text-align:center;">★<div style="font-size:11.5px;margin-top:6px;">Rewards</div></div>
+          <div class="card" style="text-align:center;color:var(--danger);">⏻<div style="font-size:11.5px;margin-top:6px;">Log Out</div></div>
+        </div>
+      </div>
+
+<div class="page" id="page-profile">
+        <h1 class="pt">Profile Management</h1>
+        <p class="pt-sub">Name, photo, personal preferences</p>
+        <div class="grid" style="grid-template-columns:220px 1fr;">
+          <div class="card" style="text-align:center;">
+            <div class="avatar" style="width:96px;height:96px;margin:0 auto;">Photo</div>
+            <button class="btn btn-gold-outline" style="margin-top:12px;width:100%;">Change Photo</button>
+            <button class="btn btn-ghost" style="margin-top:8px;width:100%;">Remove</button>
+          </div>
+          <div class="card">
+            <div class="grid g2">
+              <div><div class="label">Full Name</div><div class="field focus">Sarah Nakato</div></div>
+              <div><div class="label">Preferred Name</div><div class="field">Sarah</div></div>
+            </div>
+            <div class="grid g2" style="margin-top:12px;">
+              <div><div class="label">Email</div><div class="field">sarah@email.com</div></div>
+              <div><div class="label">Phone</div><div class="field">+256 7•• ••• 214</div></div>
+            </div>
+            <div class="grid g2" style="margin-top:12px;">
+              <div><div class="label">Date of Birth</div><div class="field">—</div></div>
+              <div><div class="label">Gender</div><div class="field">Prefer not to say ▾</div></div>
+            </div>
+            <div class="divider"></div>
+            <div class="label">Wellness Preferences (personalization)</div>
+            <div class="flex gap8" style="flex-wrap:wrap;">
+              <span class="chip gold">Sleep &amp; Calm ✕</span><span class="chip gold">Skin &amp; Glow ✕</span><span class="chip">+ Add interest</span>
+            </div>
+            <button class="btn btn-gold" style="margin-top:16px;">Save Changes</button>
+          </div>
+        </div>
+      </div>
+
+<div class="page" id="page-addresses">
+        <h1 class="pt">Address Book</h1>
+        <p class="pt-sub">Multiple shipping / billing addresses</p>
+        <div class="grid g3">
+          <div class="card">
+            <div class="flex between"><b style="font-size:12px;">Home</b><span class="chip gold">Default Shipping</span></div>
+            <p style="font-size:11.5px;color:var(--text-2);margin:8px 0;">Sarah Nakato<br>Plot 14, Ntinda Road<br>Kampala, Uganda<br>+256 7•• ••• 214</p>
+            <div class="flex gap8"><button class="btn btn-ghost">Edit</button><button class="btn btn-danger">Delete</button></div>
+          </div>
+          <div class="card">
+            <div class="flex between"><b style="font-size:12px;">Office</b><span class="chip">Billing</span></div>
+            <p style="font-size:11.5px;color:var(--text-2);margin:8px 0;">Sarah Nakato<br>Acacia Mall, Kisementi<br>Kampala, Uganda<br>+256 7•• ••• 214</p>
+            <div class="flex gap8"><button class="btn btn-ghost">Edit</button><button class="btn btn-danger">Delete</button></div>
+          </div>
+          <div class="card" style="display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--text-2);">
+            <div style="font-size:22px;">＋</div><small class="note">Add New Address</small>
+          </div>
+        </div>
+      </div>
+
+<div class="page" id="page-orders">
+        <h1 class="pt">Order History &amp; Tracking</h1>
+        <p class="pt-sub">Past &amp; current orders, real-time tracking</p>
+        <div class="flex gap8" style="margin-bottom:14px;">
+          <span class="chip gold">All</span><span class="chip">Processing</span><span class="chip">Shipped</span><span class="chip">Delivered</span><span class="chip">Returns</span>
+        </div>
+        <div class="card" style="padding:0;">
+          <table>
+            <tr><th>Order</th><th>Date</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr>
+            <tr><td>#CP-1042</td><td>28 Jun</td><td>3</td><td>UGX 95,100</td><td><span class="status ok">Delivered</span></td><td>View / Reorder</td></tr>
+            <tr><td>#CP-1031</td><td>14 Jun</td><td>1</td><td>UGX 35,000</td><td><span class="status pending">Shipped</span></td><td>Track</td></tr>
+            <tr><td>#CP-1020</td><td>02 Jun</td><td>2</td><td>UGX 46,000</td><td><span class="status danger">Return Req.</span></td><td>View</td></tr>
+          </table>
+        </div>
+        <div class="card" style="margin-top:16px;">
+          <div class="label">Order #CP-1031 — Live Tracking</div>
+          <div class="flex between" style="text-align:center;margin-top:10px;">
+            <div><div class="chip gold">●</div><small class="note">Placed</small></div>
+            <div style="flex:1;height:2px;background:var(--gold);margin-top:9px;"></div>
+            <div><div class="chip gold">●</div><small class="note">Packed</small></div>
+            <div style="flex:1;height:2px;background:var(--gold);margin-top:9px;"></div>
+            <div><div class="chip gold">●</div><small class="note">Shipped</small></div>
+            <div style="flex:1;height:2px;background:#CBDCC1;margin-top:9px;"></div>
+            <div><div class="chip">○</div><small class="note">Delivered</small></div>
+          </div>
+        </div>
+      </div>
+
+<div class="page" id="page-wishlist">
+        <h1 class="pt">Wishlist / Favorites</h1>
+        <p class="pt-sub">Saved items across all 5 product lines</p>
+        <div class="grid g4">
+          <div class="card"><div class="ph-img" style="height:100px;">[Img]</div>
+            <div style="margin-top:8px;font-size:11.5px;">Sleep Aid Candle</div>
+            <div class="gold-txt" style="font-size:12px;">UGX 35,000</div>
+            <div class="flex gap8" style="margin-top:8px;"><button class="btn btn-gold-outline" style="flex:1;">Add to Cart</button><span class="muted">♥</span></div></div>
+          <div class="card"><div class="ph-img" style="height:100px;">[Img]</div>
+            <div style="margin-top:8px;font-size:11.5px;">Moringa-Neem Detox Salt</div>
+            <div class="gold-txt" style="font-size:12px;">UGX 24,000</div>
+            <div class="flex gap8" style="margin-top:8px;"><button class="btn btn-gold-outline" style="flex:1;">Add to Cart</button><span class="muted">♥</span></div></div>
+          <div class="card"><div class="ph-img" style="height:100px;">[Img]</div>
+            <div style="margin-top:8px;font-size:11.5px;">Brightening Bar</div>
+            <div class="gold-txt" style="font-size:12px;">UGX 19,000</div>
+            <div class="flex gap8" style="margin-top:8px;"><button class="btn btn-gold-outline" style="flex:1;">Add to Cart</button><span class="muted">♥</span></div></div>
+          <div class="card" style="display:flex;align-items:center;justify-content:center;color:var(--text-2);font-size:11px;text-align:center;">Out of stock item<br>"Notify Me" enabled</div>
+        </div>
+      </div>
+
+<div class="page" id="page-payments">
+        <h1 class="pt">Saved Payment Methods</h1>
+        <p class="pt-sub">Cards &amp; mobile money on file</p>
+        <div class="grid g3">
+          <div class="card">
+            <div class="flex between"><b style="font-size:12px;">MTN MoMo</b><span class="chip gold">Default</span></div>
+            <p style="font-size:12px;color:var(--text-2);margin:10px 0;">+256 77• ••• 214</p>
+            <div class="flex gap8"><button class="btn btn-ghost">Edit</button><button class="btn btn-danger">Remove</button></div>
+          </div>
+          <div class="card">
+            <div class="flex between"><b style="font-size:12px;">Visa •••• 4821</b><span class="chip">Card</span></div>
+            <p style="font-size:12px;color:var(--text-2);margin:10px 0;">Expires 09/27</p>
+            <div class="flex gap8"><button class="btn btn-ghost">Edit</button><button class="btn btn-danger">Remove</button></div>
+          </div>
+          <div class="card" style="display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--text-2);">
+            <div style="font-size:22px;">＋</div><small class="note">Add Payment Method</small>
+          </div>
+        </div>
+        <small class="note" style="display:block;margin-top:10px;">🔒 Stored via PCI-DSS compliant payment gateway — ChrisPa never sees full card numbers.</small>
+      </div>
+
+<div class="page" id="page-settings">
+        <h1 class="pt">Account Settings &amp; Notification Preferences</h1>
+        <p class="pt-sub">Security, communication channels, privacy</p>
+        <div class="grid g2">
+          <div class="card">
+            <div class="label">Security</div>
+            <div class="flex between center-v" style="padding:8px 0;"><span style="font-size:12px;">Two-Factor Authentication</span><div class="switch on"><div class="dot"></div></div></div>
+            <div class="flex between center-v" style="padding:8px 0;"><span style="font-size:12px;">Biometric Login</span><div class="switch on"><div class="dot"></div></div></div>
+            <div class="flex between center-v" style="padding:8px 0;"><span style="font-size:12px;">Login Alerts (new device)</span><div class="switch"><div class="dot"></div></div></div>
+            <button class="btn btn-gold-outline" style="margin-top:10px;">Change Password</button>
+          </div>
+          <div class="card">
+            <div class="label">Notification Preferences</div>
+            <div class="flex between center-v" style="padding:8px 0;"><span style="font-size:12px;">Order updates — SMS</span><div class="switch on"><div class="dot"></div></div></div>
+            <div class="flex between center-v" style="padding:8px 0;"><span style="font-size:12px;">Order updates — Email</span><div class="switch on"><div class="dot"></div></div></div>
+            <div class="flex between center-v" style="padding:8px 0;"><span style="font-size:12px;">Promotions &amp; Newsletter</span><div class="switch"><div class="dot"></div></div></div>
+            <div class="flex between center-v" style="padding:8px 0;"><span style="font-size:12px;">Push Notifications</span><div class="switch on"><div class="dot"></div></div></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px;">
+          <div class="label">Privacy &amp; Data</div>
+          <div class="flex gap10"><button class="btn btn-ghost">Download My Data</button><button class="btn btn-danger">Delete Account</button></div>
+        </div>
+      </div>
+
+<div class="page" id="page-loyalty">
+        <h1 class="pt">Loyalty Points / Rewards Dashboard</h1>
+        <p class="pt-sub">Tier status, points balance, redemption</p>
+        <div class="card kpi" style="text-align:center;background:linear-gradient(135deg,#F5F9F1,#EAF3E2);">
+          <div class="label">Current Tier</div>
+          <div class="val gold-txt" style="font-size:28px;">✦ Gold Member</div>
+          <div class="delta">1,240 pts · 260 pts to Platinum</div>
+          <div style="height:6px;border-radius:4px;background:#CBDCC1;margin-top:12px;overflow:hidden;"><div style="width:78%;height:100%;background:var(--gold);"></div></div>
+        </div>
+        <div class="grid g3" style="margin-top:16px;">
+          <div class="card"><div class="label">Redeem</div><div style="font-size:12px;">500 pts → UGX 5,000 off</div>
+            <button class="btn btn-gold-outline" style="width:100%;margin-top:8px;">Redeem Now</button></div>
+          <div class="card"><div class="label">Earn More</div><small class="note">10 pts per UGX 1,000 spent · 50 pts per referral · 100 pts on birthday</small></div>
+          <div class="card"><div class="label">Points History</div><small class="note">+95 pts — Order #CP-1042<br>+30 pts — Referral: Brian K.</small></div>
+        </div>
+      </div>
+
+<div class="page" id="page-social">
+        <h1 class="pt">Connected Accounts &amp; Social</h1>
+        <p class="pt-sub">Social login management + ChrisPa's social pages listing</p>
+        <div class="grid g2">
+          <div class="card">
+            <div class="label">Linked Login Providers</div>
+            <div class="flex between center-v" style="padding:9px 0;border-bottom:1px solid #E3EDDB;"><span style="font-size:12px;">Google</span><span class="chip gold">Connected</span></div>
+            <div class="flex between center-v" style="padding:9px 0;border-bottom:1px solid #E3EDDB;"><span style="font-size:12px;">Facebook</span><button class="btn btn-ghost">Connect</button></div>
+            <div class="flex between center-v" style="padding:9px 0;"><span style="font-size:12px;">Apple</span><button class="btn btn-ghost">Connect</button></div>
+          </div>
+          <div class="card">
+            <div class="label">Follow ChrisPa Scents &amp; Soaps</div>
+            <p style="font-size:11px;color:var(--text-2);">Social pages listed site-wide (footer + this panel)</p>
+            <div class="flex gap8" style="flex-wrap:wrap;margin-top:8px;">
+              <span class="chip gold">Instagram ↗</span><span class="chip gold">Facebook ↗</span>
+              <span class="chip gold">TikTok ↗</span><span class="chip gold">WhatsApp ↗</span>
+              <span class="chip gold">Pinterest ↗</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const titles = {overview:"Overview", profile:"Profile & Photo", addresses:"Address Book", orders:"Order History", wishlist:"Wishlist", payments:"Saved Payments", settings:"Settings & Notifications", loyalty:"Loyalty & Rewards", social:"Connected & Social"};
+  document.querySelectorAll('.nav-btn[data-page]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.nav-btn[data-page]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const p = btn.dataset.page;
+      document.querySelectorAll('.page').forEach(pg=>pg.classList.remove('active'));
+      document.getElementById('page-'+p).classList.add('active');
+      document.getElementById('crumb').innerHTML = 'My Account &nbsp;/&nbsp; <b>'+titles[p]+'</b>';
+      document.getElementById('canvas').scrollTop = 0;
+    });
+  });
+</script>
+</body>
+</html>

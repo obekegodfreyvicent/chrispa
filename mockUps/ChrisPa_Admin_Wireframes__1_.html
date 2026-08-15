@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ChrisPa Scents &amp; Soaps — Admin / Backend Wireframes</title>
+<style>
+  :root{
+    --bg:#FFFFFF;
+    --surface:#F5F9F1;
+    --surface-2:#E7F0DF;
+    --gold:#1B5E20;
+    --gold-light:#3F7D32;
+    --gold-dark:#8C6836;
+    --text:#16281A;
+    --text-2:#5E7358;
+    --danger:#FF4444;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:'Segoe UI',ui-sans-serif,Helvetica,Arial,sans-serif;}
+  .display{font-family:Georgia,'Times New Roman',serif;letter-spacing:.02em;}
+
+  /* ---------- App Shell ---------- */
+  .app{display:flex;min-height:100vh;}
+  .sidenav{
+    width:230px;flex:none;background:var(--surface);
+    border-right:1px solid var(--surface-2);
+    display:flex;flex-direction:column;
+    position:sticky;top:0;height:100vh;overflow-y:auto;
+  }
+  .brand{
+    padding:20px 16px 14px;border-bottom:1px solid var(--surface-2);
+    display:flex;align-items:center;gap:10px;
+  }
+  .mark{width:34px;height:34px;flex:none;}
+  .brand-txt{line-height:1.1;}
+  .brand-txt .name{font-family:Georgia,serif;font-style:italic;color:var(--gold-light);font-size:14.5px;}
+  .brand-txt .tag{font-size:8.5px;letter-spacing:.18em;color:var(--text-2);}
+
+  .nav-group{padding:14px 10px 4px;}
+  .nav-group-label{
+    font-size:10px;letter-spacing:.14em;color:var(--gold-dark);
+    padding:6px 10px;text-transform:uppercase;
+  }
+  .nav-btn{
+    display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+    background:none;border:none;color:var(--text-2);padding:9px 10px;
+    border-radius:8px;font-size:12.5px;cursor:pointer;margin:1px 0;
+  }
+  .nav-btn:hover{background:var(--surface-2);color:var(--text);}
+  .nav-btn.active{background:var(--surface-2);color:var(--gold-light);border-left:2px solid var(--gold);}
+  .nav-icon{width:16px;text-align:center;font-size:12px;opacity:.85;}
+
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .topbar{
+    height:56px;flex:none;border-bottom:1px solid var(--surface-2);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 22px;background:linear-gradient(180deg,#F7FAF4,#FFFFFF);
+  }
+  .crumb{font-size:11.5px;color:var(--text-2);}
+  .crumb b{color:var(--gold-light);font-weight:600;}
+  .wf-badge{
+    font-size:9.5px;letter-spacing:.1em;color:var(--gold-dark);
+    border:1px solid var(--gold-dark);padding:3px 8px;border-radius:20px;
+  }
+  .canvas{padding:26px;overflow:auto;}
+  .page{display:none;}
+  .page.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  h1.pt{font-family:Georgia,serif;font-size:22px;margin:0 0 3px;color:var(--text);}
+  .pt-sub{font-size:12px;color:var(--text-2);margin:0 0 20px;}
+
+  /* ---------- generic wireframe atoms ---------- */
+  .card{
+    background:var(--surface);border:1px solid var(--surface-2);
+    border-radius:var(--radius);padding:16px;
+  }
+  .surface2{background:var(--surface-2);}
+  .ph-img{
+    background:repeating-linear-gradient(45deg,#EFF5EA,#EFF5EA 8px,#E4EEDD 8px,#E4EEDD 16px);
+    border:1px dashed #B7CDAC;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--text-2);font-size:10.5px;letter-spacing:.05em;
+  }
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    padding:9px 16px;border-radius:7px;font-size:12px;font-weight:600;
+    border:1px solid transparent;cursor:default;white-space:nowrap;
+  }
+  .btn-gold{background:var(--gold);color:#FFFFFF;}
+  .btn-gold-outline{background:transparent;border-color:var(--gold-dark);color:var(--gold-light);}
+  .btn-ghost{background:var(--surface-2);color:var(--text);}
+  .btn-danger{background:transparent;border-color:var(--danger);color:var(--danger);}
+  .chip{
+    font-size:10px;padding:3px 9px;border-radius:20px;background:var(--surface-2);
+    color:var(--text-2);border:1px solid #CBDCC1;
+  }
+  .chip.gold{color:var(--gold-light);border-color:var(--gold-dark);}
+  .field{
+    background:#FFFFFF;border:1px solid #CBDCC1;border-radius:7px;
+    padding:9px 11px;font-size:11.5px;color:var(--text-2);
+  }
+  .label{font-size:10px;color:var(--text-2);letter-spacing:.05em;margin-bottom:5px;display:block;text-transform:uppercase;}
+  .divider{height:1px;background:var(--surface-2);margin:16px 0;}
+  .grid{display:grid;gap:16px;}
+  .g2{grid-template-columns:1fr 1fr;}
+  .g3{grid-template-columns:repeat(3,1fr);}
+  .g4{grid-template-columns:repeat(4,1fr);}
+  .g5{grid-template-columns:repeat(5,1fr);}
+  .flex{display:flex;}
+  .between{justify-content:space-between;}
+  .center-v{align-items:center;}
+  .gap8{gap:8px;} .gap10{gap:10px;} .gap14{gap:14px;} .gap20{gap:20px;}
+  .muted{color:var(--text-2);}
+  .gold-txt{color:var(--gold-light);}
+  small.note{font-size:10px;color:var(--text-2);}
+  table{width:100%;border-collapse:collapse;font-size:11.5px;}
+  th{
+    text-align:left;color:var(--gold-dark);font-size:10px;letter-spacing:.08em;
+    text-transform:uppercase;padding:9px 10px;border-bottom:1px solid var(--surface-2);
+  }
+  td{padding:10px 10px;border-bottom:1px solid #E3EDDB;color:var(--text);}
+  tr:hover td{background:#EFF5EA;}
+  .status{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:600;}
+  .status.ok{background:rgba(63,125,50,.14);color:var(--gold-light);}
+  .status.pending{background:#E7F0DF;color:var(--text-2);}
+  .status.danger{background:rgba(255,68,68,.12);color:var(--danger);}
+  .kpi{padding:16px;}
+  .kpi .val{font-family:Georgia,serif;font-size:24px;color:var(--text);}
+  .kpi .delta{font-size:10.5px;color:var(--gold-light);}
+  .kpi .delta.down{color:var(--danger);}
+  .sparkline{height:36px;margin-top:8px;background:linear-gradient(180deg,rgba(63,125,50,.16),transparent);border-bottom:1.5px solid var(--gold);border-radius:2px;}
+  .sidebar-widget{padding:14px;}
+  .annot{
+    font-size:9.5px;color:var(--gold-dark);border-left:2px solid var(--gold-dark);
+    padding-left:8px;margin:10px 0;
+  }
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:#E7F0DF;border-radius:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ SIDE NAV ============ -->
+  <div class="sidenav">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#1B5E20" stroke-width="3"/>
+        <text x="50" y="63" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="46" fill="#3F7D32">C</text>
+      </svg>
+      <div class="brand-txt">
+        <div class="name">ChrisPa Scents &amp; Soaps</div>
+        <div class="tag">BEYOND CRYSTALS</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Admin / Backend</div>
+      <button class="nav-btn active" data-page="dash"><span class="nav-icon">▤</span>Dashboard</button>
+      <button class="nav-btn" data-page="pim"><span class="nav-icon">▥</span>Product Manager</button>
+      <button class="nav-btn" data-page="pim-edit"><span class="nav-icon">✎</span>Add / Edit Product</button>
+      <button class="nav-btn" data-page="oms"><span class="nav-icon">▦</span>Order Management</button>
+      <button class="nav-btn" data-page="inv"><span class="nav-icon">▧</span>Inventory</button>
+      <button class="nav-btn" data-page="crm"><span class="nav-icon">◈</span>Customers (CRM)</button>
+      <button class="nav-btn" data-page="marketing"><span class="nav-icon">%</span>Marketing &amp; Promos</button>
+      <button class="nav-btn" data-page="cms"><span class="nav-icon">▧</span>CMS / Site Builder</button>
+      <button class="nav-btn" data-page="settings"><span class="nav-icon">⚙</span>Users &amp; Settings</button>
+    </div>  </div>
+
+  <!-- ============ MAIN ============ -->
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb" id="crumb">ChrisPa Admin &nbsp;/&nbsp; <b>Dashboard</b></div>
+      <div class="wf-badge" id="badge">ADMIN / BACKEND WIREFRAME</div>
+    </div>
+    <div class="canvas" id="canvas">
+      <!-- =========================================================
+           9. ADMIN DASHBOARD
+      ========================================================== -->
+      <div class="page active" id="page-dash">
+        <h1 class="pt">Admin — Dashboard &amp; Analytics</h1>
+        <p class="pt-sub">KPI overview, sales trends, alerts — Backend Feature group 1</p>
+        <div class="grid g4">
+          <div class="card kpi"><div class="label">Revenue (30d)</div><div class="val">UGX 8.4M</div><div class="delta">▲ 12.4% vs prior</div><div class="sparkline"></div></div>
+          <div class="card kpi"><div class="label">Orders</div><div class="val">312</div><div class="delta">▲ 6.1%</div><div class="sparkline"></div></div>
+          <div class="card kpi"><div class="label">Conversion Rate</div><div class="val">3.2%</div><div class="delta down">▼ 0.4%</div><div class="sparkline"></div></div>
+          <div class="card kpi"><div class="label">Avg. Order Value</div><div class="val">UGX 27,000</div><div class="delta">▲ 2.0%</div><div class="sparkline"></div></div>
+        </div>
+        <div class="grid g2" style="margin-top:16px;">
+          <div class="card">
+            <div class="label">Sales by Product Line</div>
+            <div style="display:flex;align-items:flex-end;gap:10px;height:140px;padding-top:16px;">
+              <div style="flex:1;background:var(--gold);height:70%;border-radius:3px 3px 0 0;"></div>
+              <div style="flex:1;background:var(--gold-dark);height:45%;border-radius:3px 3px 0 0;"></div>
+              <div style="flex:1;background:var(--gold-dark);height:60%;border-radius:3px 3px 0 0;"></div>
+              <div style="flex:1;background:var(--gold-dark);height:38%;border-radius:3px 3px 0 0;"></div>
+              <div style="flex:1;background:var(--gold);height:82%;border-radius:3px 3px 0 0;"></div>
+            </div>
+            <div class="flex between muted" style="font-size:10px;margin-top:6px;"><span>Candles</span><span>Salts</span><span>Ghee</span><span>Honey</span><span>Soap Bars</span></div>
+          </div>
+          <div class="card">
+            <div class="label">Inventory Alerts</div>
+            <table><tr><th>SKU</th><th>Stock</th><th></th></tr>
+              <tr><td>Sleep Aid Candle</td><td>4 left</td><td><span class="status danger">Low</span></td></tr>
+              <tr><td>Moringa-Neem Detox Salt</td><td>9 left</td><td><span class="status danger">Low</span></td></tr>
+              <tr><td>Turmeric-Ginger Ghee</td><td>38 left</td><td><span class="status ok">OK</span></td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="annot" style="margin-top:16px;">Report tools: custom report builder · export CSV/Excel/PDF · scheduled reports · GA integration</div>
+      </div>
+
+      <!-- =========================================================
+           10. PRODUCT MANAGER (PIM LIST)
+      ========================================================== -->
+      <div class="page" id="page-pim">
+        <h1 class="pt">Admin — Product Manager</h1>
+        <p class="pt-sub">25+ SKUs across 5 lines, bulk actions, SEO — Backend Feature group 2</p>
+        <div class="flex between" style="margin-bottom:14px;">
+          <div class="flex gap8"><div class="field" style="width:220px;">Search products…</div>
+            <div class="field">Line: All ▾</div></div>
+          <div class="flex gap8"><button class="btn btn-ghost">Bulk Upload (CSV)</button><button class="btn btn-gold">+ Add Product</button></div>
+        </div>
+        <div class="card" style="padding:0;">
+          <table>
+            <tr><th>☐</th><th>Product</th><th>Line</th><th>SKU</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>
+            <tr><td>☐</td><td>Bug Repel Garden Candle</td><td>Candles</td><td>CDL-001</td><td>UGX 35,000</td><td>52</td><td><span class="status ok">Active</span></td><td>✎ ⋮</td></tr>
+            <tr><td>☐</td><td>Sleep Aid Candle</td><td>Candles</td><td>CDL-003</td><td>UGX 35,000</td><td>4</td><td><span class="status danger">Low Stock</span></td><td>✎ ⋮</td></tr>
+            <tr><td>☐</td><td>Lemon-Ginger Immune Salt</td><td>Sea Salts</td><td>SLT-001</td><td>UGX 22,000</td><td>61</td><td><span class="status ok">Active</span></td><td>✎ ⋮</td></tr>
+            <tr><td>☐</td><td>Turmeric-Ginger Healing Ghee</td><td>Ghee</td><td>GHE-001</td><td>UGX 42,000</td><td>38</td><td><span class="status ok">Active</span></td><td>✎ ⋮</td></tr>
+            <tr><td>☐</td><td>Ginger-Lemon Power Shot Honey</td><td>Honey</td><td>HNY-001</td><td>UGX 28,000</td><td>44</td><td><span class="status ok">Active</span></td><td>✎ ⋮</td></tr>
+            <tr><td>☐</td><td>Moisture Bomb Bar</td><td>Soap Bars</td><td>SOP-001</td><td>UGX 18,000</td><td>0</td><td><span class="status pending">Draft</span></td><td>✎ ⋮</td></tr>
+          </table>
+        </div>
+        <small class="note">Showing 6 of 25 SKUs · Pagination →</small>
+      </div>
+
+      <!-- =========================================================
+           11. ADD / EDIT PRODUCT
+      ========================================================== -->
+      <div class="page" id="page-pim-edit">
+        <h1 class="pt">Admin — Edit Product: Sleep Aid Candle</h1>
+        <p class="pt-sub">Full product schema incl. Uses / Directions / Health Benefits fields unique to ChrisPa data</p>
+        <div class="grid" style="grid-template-columns:1fr 280px;">
+          <div class="card">
+            <div class="grid g2">
+              <div><div class="label">Product Name</div><div class="field">Sleep Aid Candle</div></div>
+              <div><div class="label">SKU</div><div class="field">CDL-003</div></div>
+            </div>
+            <div class="grid g2" style="margin-top:12px;">
+              <div><div class="label">Product Line</div><div class="field">Scented Soywax Candles ▾</div></div>
+              <div><div class="label">Scent Notes</div><div class="field">Lavender · Chamomile · Vetiver</div></div>
+            </div>
+            <div style="margin-top:12px;"><div class="label">Uses (tags)</div>
+              <div class="flex gap8" style="flex-wrap:wrap;">
+                <span class="chip gold">Bedtime ritual ✕</span><span class="chip gold">Baby room calm-down ✕</span>
+                <span class="chip gold">Post-work decompress ✕</span><span class="chip gold">Meditation anchor ✕</span>
+                <span class="chip">+ Add</span></div></div>
+            <div style="margin-top:12px;"><div class="label">Directions</div><div class="field" style="height:50px;">Burn 2hrs before sleep, in bedroom. Inhale deeply.</div></div>
+            <div style="margin-top:12px;"><div class="label">Health Benefits</div><div class="field" style="height:50px;">Lavender + Chamomile lower cortisol. Vetiver = "oil of tranquility".</div></div>
+            <div class="grid g2" style="margin-top:12px;">
+              <div><div class="label">Price (UGX)</div><div class="field">35,000</div></div>
+              <div><div class="label">Stock Qty</div><div class="field">4</div></div>
+            </div>
+            <div style="margin-top:12px;"><div class="label">SEO — Title / Slug / Meta</div><div class="field">sleep-aid-candle-lavender-chamomile-vetiver</div></div>
+          </div>
+          <div>
+            <div class="card"><div class="label">Media</div><div class="ph-img" style="height:130px;">[ Upload image ]</div>
+              <button class="btn btn-ghost" style="width:100%;margin-top:8px;">+ Add Media</button></div>
+            <div class="card" style="margin-top:14px;"><div class="label">Status</div><span class="chip gold">Active</span>
+              <div class="divider"></div>
+              <button class="btn btn-gold" style="width:100%;">Save Product</button>
+              <button class="btn btn-danger" style="width:100%;margin-top:8px;">Delete</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           12. ORDER MANAGEMENT
+      ========================================================== -->
+      <div class="page" id="page-oms">
+        <h1 class="pt">Admin — Order Management</h1>
+        <p class="pt-sub">Status pipeline, fulfillment, shipping labels — Backend Feature group 3</p>
+        <div class="flex gap8" style="margin-bottom:14px;">
+          <span class="chip gold">All (312)</span><span class="chip">Pending (18)</span><span class="chip">Processing (24)</span>
+          <span class="chip">Shipped (41)</span><span class="chip">Delivered (219)</span><span class="chip">Refund (10)</span>
+        </div>
+        <div class="card" style="padding:0;">
+          <table>
+            <tr><th>Order</th><th>Customer</th><th>Items</th><th>Warehouse</th><th>Total</th><th>Status</th><th></th></tr>
+            <tr><td>#CP-1042</td><td>Sarah N.</td><td>3</td><td>Kampala Central</td><td>95,100</td><td><span class="status ok">Delivered</span></td><td>View</td></tr>
+            <tr><td>#CP-1041</td><td>Brian K.</td><td>1</td><td>Kampala Central</td><td>35,000</td><td><span class="status pending">Processing</span></td><td>View</td></tr>
+            <tr><td>#CP-1040</td><td>Amina O.</td><td>5</td><td>Entebbe Hub</td><td>142,000</td><td><span class="status danger">Refund Req.</span></td><td>View</td></tr>
+          </table>
+        </div>
+        <div class="grid g2" style="margin-top:16px;">
+          <div class="card"><div class="label">Order #CP-1041 — Detail</div>
+            <div class="flex gap8" style="margin:8px 0;"><span class="chip gold">Pending</span><span class="chip">Processing</span><span class="chip">Shipped</span><span class="chip">Delivered</span></div>
+            <small class="note">Edit items / address / pricing · Add internal note · Split shipment</small>
+            <div class="divider"></div>
+            <button class="btn btn-gold-outline">Print Packing Slip</button>
+            <button class="btn btn-ghost" style="margin-left:8px;">Generate Shipping Label</button></div>
+          <div class="card"><div class="label">Bulk Actions</div>
+            <small class="note">Mark as shipped · Export selected · Assign to fulfillment center · Print invoices</small></div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           13. INVENTORY
+      ========================================================== -->
+      <div class="page" id="page-inv">
+        <h1 class="pt">Admin — Inventory &amp; Warehouse</h1>
+        <p class="pt-sub">Multi-location stock, reorder rules, batch/lot — Backend Feature group 4</p>
+        <div class="grid g3" style="margin-bottom:16px;">
+          <div class="card kpi"><div class="label">Total SKUs</div><div class="val">27</div></div>
+          <div class="card kpi"><div class="label">Low Stock Alerts</div><div class="val" style="color:var(--danger);">6</div></div>
+          <div class="card kpi"><div class="label">Warehouses</div><div class="val">2</div></div>
+        </div>
+        <div class="card" style="padding:0;">
+          <table>
+            <tr><th>SKU</th><th>Batch/Lot</th><th>Kampala Central</th><th>Entebbe Hub</th><th>Reorder Pt.</th><th></th></tr>
+            <tr><td>Sleep Aid Candle</td><td>LOT-0625A</td><td>4</td><td>0</td><td>15</td><td><button class="btn btn-gold-outline">+ Purchase Order</button></td></tr>
+            <tr><td>Moringa-Neem Detox Salt</td><td>LOT-0619C</td><td>9</td><td>12</td><td>20</td><td><button class="btn btn-gold-outline">+ Purchase Order</button></td></tr>
+            <tr><td>Turmeric-Ginger Ghee</td><td>LOT-0601B</td><td>22</td><td>16</td><td>15</td><td><span class="status ok">Sufficient</span></td></tr>
+          </table>
+        </div>
+        <div class="annot">Also covers: supplier/vendor mgmt · stock transfers · cycle counts · FIFO/LIFO · damaged/expired goods log</div>
+      </div>
+
+      <!-- =========================================================
+           14. CRM
+      ========================================================== -->
+      <div class="page" id="page-crm">
+        <h1 class="pt">Admin — Customers (CRM)</h1>
+        <p class="pt-sub">Segmentation, tiers, support history, loyalty — Backend Feature group 5</p>
+        <div class="grid g4" style="margin-bottom:16px;">
+          <div class="card kpi"><div class="label">Total Customers</div><div class="val">2,148</div></div>
+          <div class="card kpi"><div class="label">VIP / Gold Tier</div><div class="val">184</div></div>
+          <div class="card kpi"><div class="label">Avg. LTV</div><div class="val">UGX 210K</div></div>
+          <div class="card kpi"><div class="label">CAC</div><div class="val">UGX 9,200</div></div>
+        </div>
+        <div class="card" style="padding:0;">
+          <table>
+            <tr><th>Customer</th><th>Tier</th><th>Orders</th><th>Spend</th><th>Last Contact</th><th></th></tr>
+            <tr><td>Sarah N.</td><td><span class="chip gold">Gold</span></td><td>14</td><td>UGX 620,000</td><td>Live chat · 2d ago</td><td>View</td></tr>
+            <tr><td>Brian K.</td><td><span class="chip">Standard</span></td><td>3</td><td>UGX 95,000</td><td>—</td><td>View</td></tr>
+            <tr><td>Amina O.</td><td><span class="chip gold">Wholesale</span></td><td>27</td><td>UGX 1.4M</td><td>Ticket #221 · open</td><td>View</td></tr>
+          </table>
+        </div>
+        <div class="annot">Segments: RFM analysis · behavior-based groups · tags &amp; notes · email campaign lists</div>
+      </div>
+
+      <!-- =========================================================
+           15. MARKETING
+      ========================================================== -->
+      <div class="page" id="page-marketing">
+        <h1 class="pt">Admin — Marketing &amp; Promotions</h1>
+        <p class="pt-sub">Coupons, bundles, campaigns, gift cards — Backend Feature group 6</p>
+        <div class="grid g2">
+          <div class="card">
+            <div class="label">Active Coupons</div>
+            <table><tr><th>Code</th><th>Type</th><th>Uses</th><th></th></tr>
+              <tr><td>CHRISPA10</td><td>10% off</td><td>412</td><td><span class="status ok">Live</span></td></tr>
+              <tr><td>SLEEPWELL</td><td>Free ship · Line 1</td><td>88</td><td><span class="status ok">Live</span></td></tr>
+              <tr><td>WELCOME5</td><td>New customers</td><td>1,204</td><td><span class="status ok">Live</span></td></tr>
+            </table>
+            <button class="btn btn-gold" style="margin-top:10px;">+ New Promotion</button>
+          </div>
+          <div class="card">
+            <div class="label">Bundle Builder — Cross-line "Wellness Kits"</div>
+            <div class="flex gap10" style="margin:10px 0;">
+              <div class="ph-img" style="height:60px;width:60px;">[Candle]</div><span style="align-self:center;">+</span>
+              <div class="ph-img" style="height:60px;width:60px;">[Honey]</div><span style="align-self:center;">+</span>
+              <div class="ph-img" style="height:60px;width:60px;">[Ghee]</div>
+            </div>
+            <small class="note">"Sleep Ritual Kit" — Sleep Aid Candle + Sleep Honey + Calm Ghee</small>
+            <div class="divider"></div>
+            <div class="label">Abandoned Cart Campaign</div>
+            <small class="note">Trigger: 24h after cart abandon → email + push · A/B testing enabled</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           16. CMS / SITE BUILDER
+      ========================================================== -->
+      <div class="page" id="page-cms">
+        <h1 class="pt">Admin — CMS / Site Builder</h1>
+        <p class="pt-sub">Homepage builder, banners, blog, pages, nav — Backend Feature group 7</p>
+        <div class="grid" style="grid-template-columns:220px 1fr;">
+          <div class="card" style="padding:10px;">
+            <div class="nav-btn active">Homepage Builder</div>
+            <div class="nav-btn">Banners / Sliders</div>
+            <div class="nav-btn">Blog Posts</div>
+            <div class="nav-btn">Static Pages</div>
+            <div class="nav-btn">Menu / Navigation</div>
+            <div class="nav-btn">Theme Settings</div>
+            <div class="nav-btn">Languages / Currency</div>
+          </div>
+          <div class="card">
+            <div class="label">Drag-and-drop sections</div>
+            <div class="grid" style="gap:10px;">
+              <div class="ph-img" style="height:50px;">[ Hero Banner block ] ⠿</div>
+              <div class="ph-img" style="height:50px;">[ Shop-by-Line grid ] ⠿</div>
+              <div class="ph-img" style="height:50px;">[ Wellness-Need chips ] ⠿</div>
+              <div class="ph-img" style="height:50px;">[ Bestsellers carousel ] ⠿</div>
+              <div class="ph-img" style="height:50px;">[ Brand Story block ] ⠿</div>
+            </div>
+            <button class="btn btn-gold-outline" style="margin-top:10px;">+ Add Section</button>
+            <button class="btn btn-gold" style="margin-top:10px;margin-left:8px;">Publish Changes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           17. USERS & SETTINGS
+      ========================================================== -->
+      <div class="page" id="page-settings">
+        <h1 class="pt">Admin — Users &amp; Settings</h1>
+        <p class="pt-sub">RBAC, integrations, security — Backend Feature groups 10 &amp; 11</p>
+        <div class="grid g2">
+          <div class="card">
+            <div class="label">Admin Users</div>
+            <table><tr><th>Name</th><th>Role</th><th>2FA</th><th></th></tr>
+              <tr><td>Chris P.</td><td>Owner</td><td><span class="status ok">On</span></td><td>✎</td></tr>
+              <tr><td>Patricia A.</td><td>Store Manager</td><td><span class="status ok">On</span></td><td>✎</td></tr>
+              <tr><td>Dennis M.</td><td>Fulfillment</td><td><span class="status danger">Off</span></td><td>✎</td></tr>
+            </table>
+            <button class="btn btn-gold-outline" style="margin-top:10px;">+ Invite Admin</button>
+          </div>
+          <div class="card">
+            <div class="label">Store Configuration</div>
+            <div class="grid g2">
+              <div><div class="label">Store Name</div><div class="field">ChrisPa Scents and Soaps</div></div>
+              <div><div class="label">Logo</div><div class="field">chrispa-logo.png</div></div>
+            </div>
+            <div class="divider"></div>
+            <div class="label">Integrations</div>
+            <div class="flex gap8" style="flex-wrap:wrap;"><span class="chip gold">Mobile Money API ✓</span><span class="chip gold">SMS Gateway ✓</span><span class="chip">Google Analytics</span><span class="chip">Meta Pixel</span></div>
+            <div class="divider"></div>
+            <div class="label">Security</div>
+            <small class="note">SSL: Active · Session timeout: 30 min · Backup: Nightly · Maintenance Mode: Off</small>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const titles = {dash:"Dashboard", pim:"Product Manager", "pim-edit":"Add / Edit Product", oms:"Order Management", inv:"Inventory", crm:"Customers (CRM)", marketing:"Marketing & Promos", cms:"CMS / Site Builder", settings:"Users & Settings"};
+  document.querySelectorAll('.nav-btn[data-page]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.nav-btn[data-page]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const p = btn.dataset.page;
+      document.querySelectorAll('.page').forEach(pg=>pg.classList.remove('active'));
+      document.getElementById('page-'+p).classList.add('active');
+      document.getElementById('crumb').innerHTML = 'ChrisPa Admin &nbsp;/&nbsp; <b>'+titles[p]+'</b>';
+      document.getElementById('canvas').scrollTop = 0;
+    });
+  });
+</script>
+
+  const titles = {
+    home:"Homepage", pdp:"Product Detail", plp:"Shop / Category", cart:"Cart",
+    checkout:"Checkout", account:"My Account", "order-track":"Order Tracking", support:"Help & Support",
+    dash:"Dashboard", pim:"Product Manager", "pim-edit":"Add / Edit Product", oms:"Order Management",
+    inv:"Inventory", crm:"Customers (CRM)", marketing:"Marketing & Promos", cms:"CMS / Site Builder",
+    settings:"Users & Settings"
+  };
+  document.querySelectorAll('.nav-btn[data-page]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.nav-btn[data-page]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const p = btn.dataset.page;
+      document.querySelectorAll('.page').forEach(pg=>pg.classList.remove('active'));
+      document.getElementById('page-'+p).classList.add('active');
+      document.getElementById('crumb').innerHTML = 'ChrisPa &nbsp;/&nbsp; <b>'+titles[p]+'</b>';
+      document.getElementById('canvas').scrollTop = 0;
+    });
+  });
+</script>
+</body>
+</html>

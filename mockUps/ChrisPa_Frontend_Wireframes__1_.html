@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ChrisPa Scents &amp; Soaps — Frontend / Client Wireframes</title>
+<style>
+  :root{
+    --bg:#FFFFFF;
+    --surface:#F5F9F1;
+    --surface-2:#E7F0DF;
+    --gold:#1B5E20;
+    --gold-light:#3F7D32;
+    --gold-dark:#8C6836;
+    --text:#16281A;
+    --text-2:#5E7358;
+    --danger:#FF4444;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:'Segoe UI',ui-sans-serif,Helvetica,Arial,sans-serif;}
+  .display{font-family:Georgia,'Times New Roman',serif;letter-spacing:.02em;}
+
+  /* ---------- App Shell ---------- */
+  .app{display:flex;min-height:100vh;}
+  .sidenav{
+    width:230px;flex:none;background:var(--surface);
+    border-right:1px solid var(--surface-2);
+    display:flex;flex-direction:column;
+    position:sticky;top:0;height:100vh;overflow-y:auto;
+  }
+  .brand{
+    padding:20px 16px 14px;border-bottom:1px solid var(--surface-2);
+    display:flex;align-items:center;gap:10px;
+  }
+  .mark{width:34px;height:34px;flex:none;}
+  .brand-txt{line-height:1.1;}
+  .brand-txt .name{font-family:Georgia,serif;font-style:italic;color:var(--gold-light);font-size:14.5px;}
+  .brand-txt .tag{font-size:8.5px;letter-spacing:.18em;color:var(--text-2);}
+
+  .nav-group{padding:14px 10px 4px;}
+  .nav-group-label{
+    font-size:10px;letter-spacing:.14em;color:var(--gold-dark);
+    padding:6px 10px;text-transform:uppercase;
+  }
+  .nav-btn{
+    display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+    background:none;border:none;color:var(--text-2);padding:9px 10px;
+    border-radius:8px;font-size:12.5px;cursor:pointer;margin:1px 0;
+  }
+  .nav-btn:hover{background:var(--surface-2);color:var(--text);}
+  .nav-btn.active{background:var(--surface-2);color:var(--gold-light);border-left:2px solid var(--gold);}
+  .nav-icon{width:16px;text-align:center;font-size:12px;opacity:.85;}
+
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .topbar{
+    height:56px;flex:none;border-bottom:1px solid var(--surface-2);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 22px;background:linear-gradient(180deg,#F7FAF4,#FFFFFF);
+  }
+  .crumb{font-size:11.5px;color:var(--text-2);}
+  .crumb b{color:var(--gold-light);font-weight:600;}
+  .wf-badge{
+    font-size:9.5px;letter-spacing:.1em;color:var(--gold-dark);
+    border:1px solid var(--gold-dark);padding:3px 8px;border-radius:20px;
+  }
+  .canvas{padding:26px;overflow:auto;}
+  .page{display:none;}
+  .page.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  h1.pt{font-family:Georgia,serif;font-size:22px;margin:0 0 3px;color:var(--text);}
+  .pt-sub{font-size:12px;color:var(--text-2);margin:0 0 20px;}
+
+  /* ---------- generic wireframe atoms ---------- */
+  .card{
+    background:var(--surface);border:1px solid var(--surface-2);
+    border-radius:var(--radius);padding:16px;
+  }
+  .surface2{background:var(--surface-2);}
+  .ph-img{
+    background:repeating-linear-gradient(45deg,#EFF5EA,#EFF5EA 8px,#E4EEDD 8px,#E4EEDD 16px);
+    border:1px dashed #B7CDAC;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--text-2);font-size:10.5px;letter-spacing:.05em;
+  }
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    padding:9px 16px;border-radius:7px;font-size:12px;font-weight:600;
+    border:1px solid transparent;cursor:default;white-space:nowrap;
+  }
+  .btn-gold{background:var(--gold);color:#FFFFFF;}
+  .btn-gold-outline{background:transparent;border-color:var(--gold-dark);color:var(--gold-light);}
+  .btn-ghost{background:var(--surface-2);color:var(--text);}
+  .btn-danger{background:transparent;border-color:var(--danger);color:var(--danger);}
+  .chip{
+    font-size:10px;padding:3px 9px;border-radius:20px;background:var(--surface-2);
+    color:var(--text-2);border:1px solid #CBDCC1;
+  }
+  .chip.gold{color:var(--gold-light);border-color:var(--gold-dark);}
+  .field{
+    background:#FFFFFF;border:1px solid #CBDCC1;border-radius:7px;
+    padding:9px 11px;font-size:11.5px;color:var(--text-2);
+  }
+  .label{font-size:10px;color:var(--text-2);letter-spacing:.05em;margin-bottom:5px;display:block;text-transform:uppercase;}
+  .divider{height:1px;background:var(--surface-2);margin:16px 0;}
+  .grid{display:grid;gap:16px;}
+  .g2{grid-template-columns:1fr 1fr;}
+  .g3{grid-template-columns:repeat(3,1fr);}
+  .g4{grid-template-columns:repeat(4,1fr);}
+  .g5{grid-template-columns:repeat(5,1fr);}
+  .flex{display:flex;}
+  .between{justify-content:space-between;}
+  .center-v{align-items:center;}
+  .gap8{gap:8px;} .gap10{gap:10px;} .gap14{gap:14px;} .gap20{gap:20px;}
+  .muted{color:var(--text-2);}
+  .gold-txt{color:var(--gold-light);}
+  small.note{font-size:10px;color:var(--text-2);}
+  table{width:100%;border-collapse:collapse;font-size:11.5px;}
+  th{
+    text-align:left;color:var(--gold-dark);font-size:10px;letter-spacing:.08em;
+    text-transform:uppercase;padding:9px 10px;border-bottom:1px solid var(--surface-2);
+  }
+  td{padding:10px 10px;border-bottom:1px solid #E3EDDB;color:var(--text);}
+  tr:hover td{background:#EFF5EA;}
+  .status{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:600;}
+  .status.ok{background:rgba(63,125,50,.14);color:var(--gold-light);}
+  .status.pending{background:#E7F0DF;color:var(--text-2);}
+  .status.danger{background:rgba(255,68,68,.12);color:var(--danger);}
+  .kpi{padding:16px;}
+  .kpi .val{font-family:Georgia,serif;font-size:24px;color:var(--text);}
+  .kpi .delta{font-size:10.5px;color:var(--gold-light);}
+  .kpi .delta.down{color:var(--danger);}
+  .sparkline{height:36px;margin-top:8px;background:linear-gradient(180deg,rgba(63,125,50,.16),transparent);border-bottom:1.5px solid var(--gold);border-radius:2px;}
+  .sidebar-widget{padding:14px;}
+  .annot{
+    font-size:9.5px;color:var(--gold-dark);border-left:2px solid var(--gold-dark);
+    padding-left:8px;margin:10px 0;
+  }
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:#E7F0DF;border-radius:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ SIDE NAV ============ -->
+  <div class="sidenav">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#1B5E20" stroke-width="3"/>
+        <text x="50" y="63" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="46" fill="#3F7D32">C</text>
+      </svg>
+      <div class="brand-txt">
+        <div class="name">ChrisPa Scents &amp; Soaps</div>
+        <div class="tag">BEYOND CRYSTALS</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Client / Frontend</div>
+      <button class="nav-btn active" data-page="home"><span class="nav-icon">⌂</span>Homepage</button>
+      <button class="nav-btn" data-page="pdp"><span class="nav-icon">▢</span>Product Detail</button>
+      <button class="nav-btn" data-page="plp"><span class="nav-icon">☰</span>Shop / Category</button>
+      <button class="nav-btn" data-page="cart"><span class="nav-icon">🛒</span>Cart</button>
+      <button class="nav-btn" data-page="checkout"><span class="nav-icon">✓</span>Checkout</button>
+      <button class="nav-btn" data-page="account"><span class="nav-icon">☺</span>My Account</button>
+      <button class="nav-btn" data-page="order-track"><span class="nav-icon">◷</span>Order Tracking</button>
+      <button class="nav-btn" data-page="support"><span class="nav-icon">?</span>Help &amp; Support</button>
+    </div>
+
+      </div>
+
+  <!-- ============ MAIN ============ -->
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb" id="crumb">ChrisPa &nbsp;/&nbsp; <b>Homepage</b></div>
+      <div class="wf-badge" id="badge">CLIENT / FRONTEND WIREFRAME</div>
+    </div>
+    <div class="canvas" id="canvas">
+      <!-- =========================================================
+           1. HOMEPAGE
+      ========================================================== -->
+      <div class="page active" id="page-home">
+        <h1 class="pt">Homepage</h1>
+        <p class="pt-sub">Hero, category entry points, personalization, trust signals — Frontend Feature groups 2, 8, 10</p>
+
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div class="ph-img" style="height:280px;border-radius:0;">[ Hero banner — seasonal promo / lifestyle image ] · CMS-managed slider (dots below)</div>
+          <div class="flex gap8" style="padding:10px 16px;">
+            <span style="width:16px;height:3px;background:var(--gold);border-radius:2px;"></span>
+            <span style="width:16px;height:3px;background:#CBDCC1;border-radius:2px;"></span>
+            <span style="width:16px;height:3px;background:#CBDCC1;border-radius:2px;"></span>
+          </div>
+        </div>
+
+        <div class="annot">Shop by Line — 5 product lines, direct category entry (from chrispa.txt SKU structure)</div>
+        <div class="grid g5">
+          <div class="card" style="text-align:center;">
+            <div class="ph-img" style="height:90px;">[Candle]</div>
+            <div style="margin-top:8px;font-size:11.5px;">Scented Soywax Candles</div>
+            <small class="note">5 SKUs · 200g</small>
+          </div>
+          <div class="card" style="text-align:center;">
+            <div class="ph-img" style="height:90px;">[Salt Jar]</div>
+            <div style="margin-top:8px;font-size:11.5px;">Flavored Sea Salts</div>
+            <small class="note">5 SKUs · 250g</small>
+          </div>
+          <div class="card" style="text-align:center;">
+            <div class="ph-img" style="height:90px;">[Ghee Jar]</div>
+            <div style="margin-top:8px;font-size:11.5px;">Herb Flavored Ghee</div>
+            <small class="note">5 SKUs · 300ml</small>
+          </div>
+          <div class="card" style="text-align:center;">
+            <div class="ph-img" style="height:90px;">[Honey Jar]</div>
+            <div style="margin-top:8px;font-size:11.5px;">Herb Infused Honey</div>
+            <small class="note">5 SKUs · 350g</small>
+          </div>
+          <div class="card" style="text-align:center;">
+            <div class="ph-img" style="height:90px;">[Soap Bar]</div>
+            <div style="margin-top:8px;font-size:11.5px;">Goat Milk + Honey Bars</div>
+            <small class="note">5 SKUs · 100g</small>
+          </div>
+        </div>
+
+        <div class="annot">Shop by Wellness Need — cross-line discovery, driven by "Uses" tags in product data</div>
+        <div class="flex gap8" style="flex-wrap:wrap;">
+          <span class="chip gold">Sleep &amp; Calm</span>
+          <span class="chip gold">Focus &amp; Energy</span>
+          <span class="chip gold">Skin &amp; Glow</span>
+          <span class="chip gold">Immune Support</span>
+          <span class="chip gold">Bug Repel / Outdoor</span>
+          <span class="chip gold">Massage &amp; Muscle</span>
+        </div>
+
+        <div class="divider"></div>
+        <div class="grid g2">
+          <div>
+            <div class="annot">Bestsellers / Recommended (AI-powered)</div>
+            <div class="grid g3">
+              <div class="card"><div class="ph-img" style="height:100px;">[Img]</div>
+                <div style="margin-top:8px;font-size:11px;">Sleep Aid Candle</div>
+                <div class="gold-txt" style="font-size:12px;">UGX 35,000</div></div>
+              <div class="card"><div class="ph-img" style="height:100px;">[Img]</div>
+                <div style="margin-top:8px;font-size:11px;">Moisture Bomb Bar</div>
+                <div class="gold-txt" style="font-size:12px;">UGX 18,000</div></div>
+              <div class="card"><div class="ph-img" style="height:100px;">[Img]</div>
+                <div style="margin-top:8px;font-size:11px;">Ginger-Lemon Honey</div>
+                <div class="gold-txt" style="font-size:12px;">UGX 28,000</div></div>
+            </div>
+          </div>
+          <div>
+            <div class="annot">Brand Story + Trust Strip</div>
+            <div class="card">
+              <p style="font-size:12px;color:var(--text-2);margin:0 0 10px;">"Beyond Crystals" brand narrative block — founders story, natural-ingredient promise, Kampala-made.</p>
+              <div class="flex gap14" style="flex-wrap:wrap;">
+                <span class="chip">🔒 Secure Checkout</span>
+                <span class="chip">🚚 Kampala Same-Day</span>
+                <span class="chip">🌿 No Parabens</span>
+                <span class="chip">↩ Easy Returns</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="annot">Footer — newsletter signup, social pages list, legal (Feature groups 8 &amp; 10)</div>
+        <div class="card flex between" style="flex-wrap:wrap;gap:16px;">
+          <div><div class="label">Newsletter</div><div class="field" style="width:220px;">your@email.com</div></div>
+          <div><div class="label">Follow ChrisPa</div><div class="flex gap8"><span class="chip">Instagram</span><span class="chip">Facebook</span><span class="chip">TikTok</span><span class="chip">WhatsApp</span></div></div>
+          <div><div class="label">Legal</div><span class="muted" style="font-size:11px;">Privacy · Terms · Cookie Settings</span></div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           2. PRODUCT DETAIL PAGE
+      ========================================================== -->
+      <div class="page" id="page-pdp">
+        <h1 class="pt">Product Detail — "Sleep Aid Candle"</h1>
+        <p class="pt-sub">Media, variants, uses/directions/health benefits (from product data), reviews — Frontend Feature group 3</p>
+
+        <div class="grid g2">
+          <div>
+            <div class="ph-img" style="height:340px;">[ Main image — zoom on hover ]</div>
+            <div class="grid g4" style="margin-top:10px;">
+              <div class="ph-img" style="height:60px;">[thumb]</div>
+              <div class="ph-img" style="height:60px;">[thumb]</div>
+              <div class="ph-img" style="height:60px;">[thumb]</div>
+              <div class="ph-img" style="height:60px;">[360°]</div>
+            </div>
+          </div>
+          <div>
+            <span class="chip gold">Line 1 · Scented Soywax Candles</span>
+            <h1 class="pt" style="margin-top:10px;">Sleep Aid Candle</h1>
+            <div class="muted" style="font-size:12px;">Lavender · Chamomile · Vetiver</div>
+            <div class="flex gap8 center-v" style="margin:8px 0;">
+              <span style="color:var(--gold);">★★★★☆</span><span class="muted" style="font-size:11px;">(128 reviews) · Q&amp;A (12)</span>
+            </div>
+            <div class="gold-txt" style="font-size:22px;font-family:Georgia,serif;">UGX 35,000</div>
+            <div class="divider"></div>
+            <div class="label">Size</div>
+            <div class="flex gap8"><span class="chip gold">200g</span><span class="chip">400g</span></div>
+            <div class="label" style="margin-top:12px;">Quantity</div>
+            <div class="flex gap8 center-v"><div class="field" style="width:90px;text-align:center;">— 1 +</div>
+              <span class="chip" style="color:var(--gold-light);border-color:var(--gold-dark);">✓ In stock</span></div>
+            <div class="flex gap10" style="margin-top:16px;">
+              <button class="btn btn-gold">Add to Cart</button>
+              <button class="btn btn-gold-outline">Buy Now</button>
+              <button class="btn btn-ghost">♡</button>
+            </div>
+            <button class="btn btn-ghost" style="margin-top:8px;width:100%;">Notify Me — Back in Stock</button>
+
+            <div class="divider"></div>
+            <div class="grid g3">
+              <div class="card sidebar-widget"><div class="label">Uses</div>
+                <small class="note">Bedtime ritual · Baby room calm-down · Meditation anchor · Nap-time ambiance</small></div>
+              <div class="card sidebar-widget"><div class="label">Directions</div>
+                <small class="note">Burn 2 hrs before sleep, in bedroom. Inhale deeply.</small></div>
+              <div class="card sidebar-widget"><div class="label">Health Benefits</div>
+                <small class="note">Lavender + Chamomile lower cortisol. Vetiran calms the nervous system.</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="grid g2">
+          <div>
+            <div class="annot">Customer Reviews &amp; Photos</div>
+            <div class="card">
+              <div class="flex between"><span style="color:var(--gold);">★★★★★</span><small class="note">2 days ago</small></div>
+              <p style="font-size:11.5px;color:var(--text-2);margin:6px 0 0;">"Helped my toddler settle for naps." — with 2 photos attached</p>
+            </div>
+          </div>
+          <div>
+            <div class="annot">Frequently Bought Together</div>
+            <div class="card flex gap10">
+              <div class="ph-img" style="height:60px;width:60px;">[+]</div>
+              <div class="ph-img" style="height:60px;width:60px;">[+]</div>
+              <div class="flex" style="align-items:center;"><button class="btn btn-gold-outline">Add bundle · UGX 61,000</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           3. SHOP / CATEGORY (PLP)
+      ========================================================== -->
+      <div class="page" id="page-plp">
+        <h1 class="pt">Shop — Flavored Coarse Sea Salts</h1>
+        <p class="pt-sub">Grid/list toggle, filters, sort, breadcrumb — Frontend Feature group 2</p>
+        <div class="muted" style="font-size:11px;margin-bottom:16px;">Home / Shop / <span class="gold-txt">Sea Salts</span></div>
+
+        <div class="grid" style="grid-template-columns:220px 1fr;">
+          <div class="card">
+            <div class="label">Filter</div>
+            <div style="margin-bottom:14px;"><b style="font-size:11.5px;">Product Line</b>
+              <div class="muted" style="font-size:11px;line-height:2;">☑ Sea Salts<br>☐ Candles<br>☐ Ghee<br>☐ Honey<br>☐ Soap Bars</div></div>
+            <div style="margin-bottom:14px;"><b style="font-size:11.5px;">Wellness Use</b>
+              <div class="muted" style="font-size:11px;line-height:2;">☐ Bath Soak<br>☑ Culinary<br>☐ Scrub / Exfoliate<br>☐ Detox</div></div>
+            <div style="margin-bottom:14px;"><b style="font-size:11.5px;">Price</b>
+              <div class="field" style="margin-top:6px;">UGX 10,000 — 40,000</div></div>
+            <div><b style="font-size:11.5px;">Rating</b>
+              <div class="muted" style="font-size:11px;">★★★★ &amp; up</div></div>
+          </div>
+
+          <div>
+            <div class="flex between" style="margin-bottom:14px;">
+              <span class="muted" style="font-size:11.5px;">5 results</span>
+              <div class="flex gap10">
+                <span class="chip">☰ List</span><span class="chip gold">▦ Grid</span>
+                <div class="field">Sort: Relevance ▾</div>
+              </div>
+            </div>
+            <div class="grid g3">
+              <div class="card"><div class="ph-img" style="height:110px;">[Img]</div>
+                <div style="margin-top:8px;font-size:11.5px;">Lemon-Ginger Immune Salt</div>
+                <div class="gold-txt" style="font-size:12px;">UGX 22,000</div></div>
+              <div class="card"><div class="ph-img" style="height:110px;">[Img]</div>
+                <div style="margin-top:8px;font-size:11.5px;">Moringa-Neem Detox Salt</div>
+                <div class="gold-txt" style="font-size:12px;">UGX 24,000</div></div>
+              <div class="card"><div class="ph-img" style="height:110px;">[Img]</div>
+                <div style="margin-top:8px;font-size:11.5px;">Garlic-Herb Culinary Salt</div>
+                <div class="gold-txt" style="font-size:12px;">UGX 20,000</div></div>
+              <div class="card"><div class="ph-img" style="height:110px;">[Img]</div>
+                <div style="margin-top:8px;font-size:11.5px;">Hibiscus-Lemongrass Glow Salt</div>
+                <div class="gold-txt" style="font-size:12px;">UGX 26,000</div></div>
+              <div class="card"><div class="ph-img" style="height:110px;">[Img]</div>
+                <div style="margin-top:8px;font-size:11.5px;">Eucalyptus-Mint Breathe Salt</div>
+                <div class="gold-txt" style="font-size:12px;">UGX 23,000</div></div>
+              <div class="card" style="display:flex;align-items:center;justify-content:center;color:var(--text-2);font-size:11px;">Recently viewed / Compare tray</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           4. CART
+      ========================================================== -->
+      <div class="page" id="page-cart">
+        <h1 class="pt">Shopping Cart</h1>
+        <p class="pt-sub">Line items, promo, persistent cart across devices — Frontend Feature group 4</p>
+        <div class="grid" style="grid-template-columns:1fr 320px;">
+          <div class="card">
+            <div class="flex between" style="padding-bottom:10px;border-bottom:1px solid var(--surface-2);">
+              <b style="font-size:12px;">3 items</b><span class="muted" style="font-size:11px;">Save for later (1)</span>
+            </div>
+            <div class="flex between center-v" style="padding:14px 0;border-bottom:1px solid #E3EDDB;">
+              <div class="flex gap10 center-v"><div class="ph-img" style="height:56px;width:56px;">[Img]</div>
+                <div><div style="font-size:12px;">Sleep Aid Candle · 200g</div><small class="note">Qty — 1 +</small></div></div>
+              <div class="flex gap14 center-v"><span class="gold-txt" style="font-size:12.5px;">UGX 35,000</span><span class="muted">✕</span></div>
+            </div>
+            <div class="flex between center-v" style="padding:14px 0;border-bottom:1px solid #E3EDDB;">
+              <div class="flex gap10 center-v"><div class="ph-img" style="height:56px;width:56px;">[Img]</div>
+                <div><div style="font-size:12px;">Moisture Bomb Bar · 100g</div><small class="note">Qty — 2 +</small></div></div>
+              <div class="flex gap14 center-v"><span class="gold-txt" style="font-size:12.5px;">UGX 36,000</span><span class="muted">✕</span></div>
+            </div>
+            <div class="flex between center-v" style="padding:14px 0;">
+              <div class="flex gap10 center-v"><div class="ph-img" style="height:56px;width:56px;">[Img]</div>
+                <div><div style="font-size:12px;">Ginger-Lemon Power Honey</div><small class="note">Qty — 1 +</small></div></div>
+              <div class="flex gap14 center-v"><span class="gold-txt" style="font-size:12.5px;">UGX 28,000</span><span class="muted">✕</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="label">Promo Code</div>
+            <div class="flex gap8"><div class="field" style="flex:1;">CHRISPA10</div><button class="btn btn-ghost">Apply</button></div>
+            <div class="divider"></div>
+            <div class="flex between" style="font-size:11.5px;color:var(--text-2);margin-bottom:6px;"><span>Subtotal</span><span>UGX 99,000</span></div>
+            <div class="flex between" style="font-size:11.5px;color:var(--text-2);margin-bottom:6px;"><span>Est. Shipping</span><span>UGX 6,000</span></div>
+            <div class="flex between" style="font-size:11.5px;color:var(--danger);margin-bottom:10px;"><span>Discount</span><span>− UGX 9,900</span></div>
+            <div class="divider"></div>
+            <div class="flex between" style="font-size:15px;margin-bottom:16px;"><b>Total</b><b class="gold-txt">UGX 95,100</b></div>
+            <button class="btn btn-gold" style="width:100%;">Proceed to Checkout</button>
+            <small class="note" style="display:block;margin-top:10px;">Cart auto-saves to your account across devices.</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           5. CHECKOUT
+      ========================================================== -->
+      <div class="page" id="page-checkout">
+        <h1 class="pt">Checkout</h1>
+        <p class="pt-sub">Guest option, multi-step, payment, order summary — Frontend Feature group 5</p>
+        <div class="flex gap20" style="margin-bottom:20px;">
+          <span class="chip gold">1 · Shipping</span><span class="chip">2 · Payment</span><span class="chip">3 · Review</span>
+        </div>
+        <div class="grid" style="grid-template-columns:1fr 320px;">
+          <div>
+            <div class="card">
+              <div class="label">Contact</div>
+              <div class="flex gap10"><div class="field" style="flex:1;">Email or phone</div>
+                <span class="chip" style="align-self:center;">Guest Checkout ✓</span></div>
+              <div class="divider"></div>
+              <div class="label">Shipping Address</div>
+              <div class="grid g2"><div class="field">Full name</div><div class="field">Phone number</div></div>
+              <div class="field" style="margin-top:10px;">Address (auto-complete)</div>
+              <div class="grid g2" style="margin-top:10px;"><div class="field">City — Kampala</div><div class="field">Delivery notes</div></div>
+              <div class="divider"></div>
+              <div class="label">Delivery Method</div>
+              <div class="flex gap10" style="flex-wrap:wrap;">
+                <span class="chip gold">Standard · Free</span><span class="chip">Express · UGX 8,000</span><span class="chip">Same-day (Kla) · UGX 12,000</span>
+              </div>
+              <div class="field" style="margin-top:10px;">Delivery time-slot ▾</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="label">Order Summary</div>
+            <div class="flex between" style="font-size:11.5px;margin-bottom:6px;"><span class="muted">3 items</span><span>UGX 99,000</span></div>
+            <div class="flex between" style="font-size:11.5px;margin-bottom:6px;"><span class="muted">Shipping</span><span>Free</span></div>
+            <div class="divider"></div>
+            <div class="flex between" style="font-size:15px;margin-bottom:14px;"><b>Total</b><b class="gold-txt">UGX 99,000</b></div>
+            <div class="label">Payment</div>
+            <div class="flex gap8" style="flex-wrap:wrap;margin-bottom:10px;">
+              <span class="chip gold">Mobile Money</span><span class="chip">Card</span><span class="chip">Cash on Delivery</span>
+            </div>
+            <button class="btn btn-gold" style="width:100%;">Place Order</button>
+            <small class="note" style="display:block;margin-top:8px;">🔒 PCI-DSS secured payment gateway</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           6. MY ACCOUNT
+      ========================================================== -->
+      <div class="page" id="page-account">
+        <h1 class="pt">My Account</h1>
+        <p class="pt-sub">Profile, addresses, wishlist, rewards, loyalty — Frontend Feature group 1</p>
+        <div class="grid" style="grid-template-columns:200px 1fr;">
+          <div class="card" style="padding:10px;">
+            <div class="nav-btn active">Profile</div>
+            <div class="nav-btn">Order History</div>
+            <div class="nav-btn">Address Book</div>
+            <div class="nav-btn">Wishlist</div>
+            <div class="nav-btn">Saved Payments</div>
+            <div class="nav-btn">Loyalty &amp; Rewards</div>
+            <div class="nav-btn">Notifications</div>
+            <div class="nav-btn" style="color:var(--danger);">Log out</div>
+          </div>
+          <div>
+            <div class="grid g2">
+              <div class="card"><div class="label">Name</div><div class="field">Sarah N.</div>
+                <div class="label" style="margin-top:10px;">Email</div><div class="field">sarah@email.com</div>
+                <button class="btn btn-gold-outline" style="margin-top:12px;">Save Changes</button></div>
+              <div class="card kpi" style="text-align:center;">
+                <div class="label">Loyalty Points</div>
+                <div class="val gold-txt">1,240 pts</div>
+                <div class="delta">≈ UGX 12,400 credit · Tier: Gold Member</div>
+              </div>
+            </div>
+            <div class="annot">Recent Orders</div>
+            <table class="card" style="display:table;">
+              <tr><th>Order</th><th>Date</th><th>Items</th><th>Status</th><th>Total</th></tr>
+              <tr><td>#CP-1042</td><td>28 Jun</td><td>3</td><td><span class="status ok">Delivered</span></td><td>UGX 95,100</td></tr>
+              <tr><td>#CP-1031</td><td>14 Jun</td><td>1</td><td><span class="status pending">Shipped</span></td><td>UGX 35,000</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           7. ORDER TRACKING
+      ========================================================== -->
+      <div class="page" id="page-order-track">
+        <h1 class="pt">Order Tracking — #CP-1031</h1>
+        <p class="pt-sub">Real-time status, carrier tracking, returns — Frontend Feature group 6</p>
+        <div class="card">
+          <div class="flex between" style="text-align:center;">
+            <div><div class="chip gold">●</div><small class="note">Placed</small></div>
+            <div style="flex:1;height:2px;background:var(--gold);margin-top:9px;"></div>
+            <div><div class="chip gold">●</div><small class="note">Packed</small></div>
+            <div style="flex:1;height:2px;background:var(--gold);margin-top:9px;"></div>
+            <div><div class="chip gold">●</div><small class="note">Shipped</small></div>
+            <div style="flex:1;height:2px;background:#CBDCC1;margin-top:9px;"></div>
+            <div><div class="chip">○</div><small class="note">Delivered</small></div>
+          </div>
+        </div>
+        <div class="grid g2" style="margin-top:16px;">
+          <div class="card"><div class="label">Carrier</div><div style="font-size:12px;">SafeBoda Logistics — tracking #SB88213</div>
+            <small class="note">ETA: Today, 4:00–6:00 PM</small>
+            <div class="divider"></div>
+            <button class="btn btn-ghost">Cancel Order</button>
+            <button class="btn btn-danger" style="margin-left:8px;">Request Return / Refund</button></div>
+          <div class="card"><div class="label">Delivery Notifications</div>
+            <small class="note">SMS + Email + Push enabled for this order</small>
+            <div class="divider"></div>
+            <button class="btn btn-gold-outline">Download Invoice (PDF)</button></div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           8. SUPPORT
+      ========================================================== -->
+      <div class="page" id="page-support">
+        <h1 class="pt">Help &amp; Support</h1>
+        <p class="pt-sub">Live chat, FAQ, tickets — Frontend Feature group 7</p>
+        <div class="grid g3">
+          <div class="card"><div class="label">Live Chat</div><small class="note">AI Assistant "Pa" — online now</small>
+            <div class="ph-img" style="height:120px;margin-top:10px;">[ Chat widget preview ]</div></div>
+          <div class="card"><div class="label">FAQ / Knowledge Base</div>
+            <small class="note">Shipping to Kampala · Candle safety · Returns policy · Ingredient sourcing</small></div>
+          <div class="card"><div class="label">Raise a Ticket</div>
+            <div class="field" style="margin-top:8px;">Order # (optional)</div>
+            <div class="field" style="margin-top:8px;height:60px;">Describe your issue…</div>
+            <button class="btn btn-gold" style="margin-top:10px;width:100%;">Submit Ticket</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const titles = {home:"Homepage", pdp:"Product Detail", plp:"Shop / Category", cart:"Cart", checkout:"Checkout", account:"My Account", "order-track":"Order Tracking", support:"Help & Support"};
+  document.querySelectorAll('.nav-btn[data-page]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.nav-btn[data-page]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const p = btn.dataset.page;
+      document.querySelectorAll('.page').forEach(pg=>pg.classList.remove('active'));
+      document.getElementById('page-'+p).classList.add('active');
+      document.getElementById('crumb').innerHTML = 'ChrisPa &nbsp;/&nbsp; <b>'+titles[p]+'</b>';
+      document.getElementById('canvas').scrollTop = 0;
+    });
+  });
+</script>
+
+  const titles = {
+    home:"Homepage", pdp:"Product Detail", plp:"Shop / Category", cart:"Cart",
+    checkout:"Checkout", account:"My Account", "order-track":"Order Tracking", support:"Help & Support",
+    dash:"Dashboard", pim:"Product Manager", "pim-edit":"Add / Edit Product", oms:"Order Management",
+    inv:"Inventory", crm:"Customers (CRM)", marketing:"Marketing & Promos", cms:"CMS / Site Builder",
+    settings:"Users & Settings"
+  };
+  document.querySelectorAll('.nav-btn[data-page]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.nav-btn[data-page]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const p = btn.dataset.page;
+      document.querySelectorAll('.page').forEach(pg=>pg.classList.remove('active'));
+      document.getElementById('page-'+p).classList.add('active');
+      document.getElementById('crumb').innerHTML = 'ChrisPa &nbsp;/&nbsp; <b>'+titles[p]+'</b>';
+      document.getElementById('canvas').scrollTop = 0;
+    });
+  });
+</script>
+</body>
+</html>

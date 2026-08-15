@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chrispa
+      POSTGRES_PASSWORD: chrispa
+      POSTGRES_DB: chrispa
+    ports:
+      # host 5440, not 5432 — this machine already runs other projects' Postgres
+      # containers/services on 5432 and the 5434-5439 range.
+      - "5440:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      # host 6380, not 6379 — already bound by another project's redis container.
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:

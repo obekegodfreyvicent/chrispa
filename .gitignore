@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+
+# env
+.env
+.env.*
+!.env.example
+
+# build output
+dist/
+build/
+.next/
+out/
+
+# prisma
+apps/api/generated/
+
+# local file storage (no object-storage/CDN integration yet — see main.ts)
+apps/api/uploads/
+
+# logs
+*.log
+npm-debug.log*
+
+# OS/editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# testing
+coverage/

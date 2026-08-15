@@ -1,0 +1,1829 @@
+// ChrisPa Scents and Soaps — data model per docs/SRS.md §9
+// Prisma schema — PostgreSQL
+//
+// Conventions:
+// - IDs are client-generated UUIDs (Prisma's default(uuid())), not DB sequences.
+// - All timestamps are stored as timestamptz (UTC) — never plain `timestamp`,
+//   to avoid ambiguity once the store expands beyond Uganda's single timezone.
+// - Non-unique @@index blocks exist on every foreign key that isn't already
+//   covered by a @unique/@@unique constraint — Prisma does NOT add these
+//   automatically on PostgreSQL, unlike some other connectors.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Identity & accounts ----------
+
+enum UserRole {
+  CUSTOMER
+  OWNER
+  STORE_MANAGER
+  FULFILLMENT
+  SUPPORT_AGENT
+  HR_MANAGER
+}
+
+enum CustomerTier {
+  STANDARD
+  GOLD
+  WHOLESALE
+}
+
+model User {
+  id                  String       @id @default(uuid())
+  email               String?      @unique
+  phone               String?      @unique
+  name                String
+  preferredName       String?
+  // Pasted image URL, same convention as Product/ProductMedia — no
+  // upload/object-storage pipeline exists yet (see CatalogService).
+  avatarUrl           String?
+  passwordHash        String?
+  role                UserRole     @default(CUSTOMER)
+  tier                CustomerTier @default(STANDARD)
+  dateOfBirth         DateTime?    @db.Timestamptz(3)
+  gender              String?
+  wellnessPreferences String[]     @default([])
+  // TOTP-based 2FA (RFC 6238), fully implemented and enforced at login — see
+  // TwoFactorService/AuthService.
+  twoFactorEnabled    Boolean      @default(false)
+  // Encrypted at rest (AES-256-GCM, see totp-crypto.util.ts) — unlike a
+  // password hash, verifying a TOTP code needs the raw secret back, so it
+  // can't be one-way hashed; encryption is the next best thing against a DB
+  // read leaking every user's 2FA secret in plaintext.
+  twoFactorSecret     String?
+  // True once the account has at least one WebAuthnCredential — see
+  // WebauthnService. Registering a credential sets it, removing the last one
+  // clears it, mirroring the 2FA enable/disable flag's semantics.
+  biometricEnabled    Boolean      @default(false)
+  // Notification preferences — genuinely safe to store today even without a
+  // live SMS/email/push delivery pipeline yet; these will govern that
+  // pipeline once it exists (same "store the preference before the delivery
+  // mechanism exists" pattern as Profile.wellnessPreferences). Defaults
+  // match the wireframe's pre-set switches.
+  notifyOrderUpdatesSms   Boolean @default(true)
+  notifyOrderUpdatesEmail Boolean @default(true)
+  notifyPromotions        Boolean @default(false)
+  notifyPush              Boolean @default(true)
+  // Login Alerts (new device) — real detection (LoginEvent), but delivered
+  // in-app (a dismissible banner + history in Settings), not via SMS/email,
+  // since no delivery provider is connected. See AuthService.recordLoginEvent().
+  notifyLoginAlerts       Boolean @default(false)
+  // Set true when Executive/HR issues a one-time temporary password while
+  // creating (or granting a login to) a staff Employee — see
+  // EmployeesService.createLoginInternal(). Baked into the access-token JWT
+  // payload (see AuthService.issueTokens()) and enforced globally by
+  // MustChangePasswordGuard, which blocks every endpoint except
+  // /auth/change-password (and /auth/logout, /auth/me) until it's cleared —
+  // "the first thing they do should be a password reset before any
+  // operation," per user decision.
+  mustChangePassword  Boolean      @default(false)
+  // Set once the matching OtpCode (channel EMAIL/SMS) has been confirmed at
+  // registration — see OtpService.verify()/AuthService.verifyOtp(). Login
+  // with a password is blocked until both are non-null when the account has
+  // a phone number (see AuthService.login()'s hard gate); a Google-created
+  // account gets emailVerifiedAt set immediately (Google already proved the
+  // address is real) and no phoneVerifiedAt requirement, since social
+  // sign-up never collects a phone number — see AuthService.googleLogin().
+  emailVerifiedAt     DateTime?    @db.Timestamptz(3)
+  phoneVerifiedAt     DateTime?    @db.Timestamptz(3)
+  // Set on first Google sign-in (AuthService.googleLogin()) — either a new
+  // account or linked onto an existing email match. Null for every
+  // password-only account.
+  googleId            String?      @unique
+  // FR-17.4 Delete Account — same "never hard-delete" convention as Order
+  // and Employee, for the same reason (financial/legal retention). The row
+  // survives with PII scrubbed (see AccountSettingsService.deleteAccount());
+  // this timestamp is what actually marks it deleted. email/phone are
+  // cleared too so the address becomes free for a future re-registration —
+  // Postgres treats each NULL as distinct, so clearing them doesn't collide
+  // with the @unique constraint even across multiple deleted accounts.
+  deletedAt           DateTime?    @db.Timestamptz(3)
+  createdAt           DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime     @updatedAt @db.Timestamptz(3)
+
+  addresses      Address[]
+  paymentMethods PaymentMethod[]
+  orders         Order[]
+  cart           Cart?
+  wishlistItems  WishlistItem[]
+  reviews        Review[]
+  loyaltyAccount LoyaltyAccount?
+  supportTickets SupportTicket[]
+  ticketMessages TicketMessage[]
+  refreshTokens  RefreshToken[]
+  webauthnCredentials WebAuthnCredential[]
+  loginEvents         LoginEvent[]
+  otpCodes            OtpCode[]
+  notifications       Notification[]
+  employee       Employee?
+  reviewedLeaveRequests    LeaveRequest[]     @relation("LeaveReviewer")
+  reviewedShiftSwaps       ShiftSwapRequest[] @relation("SwapReviewer")
+  goalsCreated         PerformanceGoal[]
+  feedbackGiven        PerformanceFeedback[]
+  performanceReviewsConducted PerformanceReview[]
+  jobPostingsCreated   JobPosting[]
+  payrollPeriodsCreated PayrollPeriod[] @relation("PayrollPeriodCreatedBy")
+  advancesApproved      SalaryAdvance[] @relation("AdvanceApprovedBy")
+  payrollAdjustmentsCreated PayrollAdjustment[] @relation("PayrollAdjustmentCreatedBy")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  expiresAt DateTime  @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  // matches AuthService.refresh()'s `where: { userId, revokedAt: null, expiresAt: { gt: now } }`
+  @@index([userId, revokedAt])
+}
+
+// FR-17.1 Biometric Login — WebAuthn/passkey credentials (see WebauthnService).
+// One row per registered authenticator (a user can register more than one
+// device); publicKey/counter are what verifyAuthentication() checks a login
+// assertion against — never anything biometric itself, that data never
+// leaves the user's device, which is the whole point of WebAuthn.
+model WebAuthnCredential {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      BigInt    @default(0)
+  deviceLabel  String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  lastUsedAt   DateTime?
+
+  @@index([userId])
+}
+
+// FR-17.1 Login Alerts (new device) — one row per completed login (password,
+// 2FA-completed, or WebAuthn; NOT token refresh, which isn't a new login).
+// isNewDevice is a lightweight (ip, userAgent) fingerprint match against this
+// user's own history, not a rigorous device-identity system — documented
+// limitation, not an oversight. See AuthService.recordLoginEvent().
+model LoginEvent {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress      String?
+  userAgent      String?
+  isNewDevice    Boolean   @default(false)
+  acknowledgedAt DateTime? @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
+}
+
+enum NotificationType {
+  NEWSLETTER
+}
+
+// FR-26.4/AL-adjacent — a generic in-app notification center, first used by
+// the admin "Compose Newsletter" flow (MarketingService.sendNewsletter()):
+// every active NewsletterSubscriber whose email also matches a User account
+// gets one of these alongside the email that always goes out to the whole
+// subscriber list (subscribers with no matching account only get the
+// email — there's no account to attach an in-app notification to).
+// Deliberately generic (a `type` discriminator, not a newsletter-specific
+// table) so future features (order updates, promo announcements, etc.) can
+// reuse it instead of each growing their own bespoke in-app alert model.
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  linkUrl   String?
+  readAt    DateTime?        @db.Timestamptz(3)
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
+}
+
+enum OtpChannel {
+  EMAIL
+  SMS
+}
+
+enum OtpPurpose {
+  REGISTRATION
+}
+
+// Registration OTP (email via SMTP, SMS via Africa's Talking) — see
+// OtpService. destination snapshots the email/phone the code was actually
+// sent to at issue time (not a live join to User) so a resend after the
+// user edits their profile can't silently target a stale address without
+// it being obvious from this row. codeHash follows the same
+// createHash('sha256') convention as RefreshToken.tokenHash — a 6-digit
+// code has far less entropy than a refresh token, but hashing it the same
+// way keeps a DB read from leaking a valid code directly, and bcrypt would
+// be needless overhead for what's already a rate-limited, short-lived,
+// single-use value.
+model OtpCode {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel     OtpChannel
+  purpose     OtpPurpose @default(REGISTRATION)
+  destination String
+  codeHash    String
+  attempts    Int        @default(0)
+  consumedAt  DateTime?  @db.Timestamptz(3)
+  expiresAt   DateTime   @db.Timestamptz(3)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
+
+  // matches OtpService's `where: { userId, channel, purpose, consumedAt: null }` lookup
+  @@index([userId, channel, purpose])
+}
+
+enum AddressType {
+  SHIPPING
+  BILLING
+}
+
+model Address {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  recipient String
+  line1     String
+  city      String      @default("Kampala")
+  phone     String
+  type      AddressType @default(SHIPPING)
+  isDefault Boolean     @default(false)
+  createdAt DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime    @updatedAt @db.Timestamptz(3)
+
+  @@index([userId])
+}
+
+enum PaymentMethodType {
+  MOBILE_MONEY
+  CARD
+  PAYPAL
+}
+
+model PaymentMethod {
+  id               String            @id @default(uuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type             PaymentMethodType
+  maskedIdentifier String
+  gatewayToken     String
+  isDefault        Boolean           @default(false)
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
+
+  @@index([userId])
+}
+
+// ---------- Catalog ----------
+
+model ProductLine {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  slug     String    @unique
+  unitSize String
+  products Product[]
+}
+
+model WellnessTag {
+  id       String               @id @default(uuid())
+  label    String               @unique
+  products ProductWellnessTag[]
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model Product {
+  id            String        @id @default(uuid())
+  sku           String        @unique
+  name          String
+  slug          String        @unique
+  productLineId String
+  productLine   ProductLine   @relation(fields: [productLineId], references: [id])
+  priceUgx      Int
+  // MKT-FR-1 (docs/SRS.md §21): null = ChrisPa's own product (the original,
+  // still-default case); set = a third-party vendor's product in the
+  // marketplace. RevenueRecognitionService reads this at order-delivery
+  // time to decide gross (platform product) vs net/commission (vendor
+  // product) revenue treatment — see OrderItem.vendorId below for why that
+  // decision is snapshotted per line item rather than read live from here.
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id])
+  // MKT-FR-3/FIN-FR-7: cost basis for COGS. Optional because it doesn't
+  // exist for legacy/seed products created before this field — COGS posting
+  // is skipped (not zero-cost-assumed) for a product with no costUgx set,
+  // see RevenueRecognitionService.
+  costUgx Int?
+  // Denormalized total across all InventoryRecord rows for this product —
+  // a fast read for "in stock?" badges. InventoryRecord is the source of
+  // truth for actual per-warehouse counts; nothing currently keeps this in
+  // sync automatically (there's no stock-adjustment service yet — see
+  // docs/SRS.md FR-23/FR-24), so treat it as a manually-maintained cache
+  // until that lands.
+  stockQty           Int           @default(0)
+  status             ProductStatus @default(DRAFT)
+  scentOrFlavorNotes String?
+  directions         String?
+  healthBenefits     String?
+  // `slug` above already *is* the SEO/routing slug — seoTitle/seoMeta cover
+  // the rest of on-page SEO metadata without a redundant second slug field.
+  seoTitle           String?
+  seoMeta            String?
+  createdAt          DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime      @updatedAt @db.Timestamptz(3)
+
+  media            ProductMedia[]
+  variants         Variant[]
+  wellnessTags     ProductWellnessTag[]
+  inventoryRecords InventoryRecord[]
+  reviews          Review[]
+  cartItems        CartItem[]
+  orderItems       OrderItem[]
+  wishlistItems    WishlistItem[]
+
+  @@index([productLineId])
+  @@index([status, productLineId])
+  @@index([vendorId])
+}
+
+model ProductWellnessTag {
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  wellnessTagId String
+  wellnessTag   WellnessTag @relation(fields: [wellnessTagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, wellnessTagId])
+  @@index([wellnessTagId])
+}
+
+model ProductMedia {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([productId])
+}
+
+model Variant {
+  id         String  @id @default(uuid())
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size       String
+  priceDelta Int     @default(0)
+  // Same denormalized-cache caveat as Product.stockQty above.
+  stockQty   Int     @default(0)
+
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@index([productId])
+}
+
+// ---------- Inventory & fulfillment ----------
+
+model Warehouse {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  location  String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  inventoryRecords InventoryRecord[]
+  orders           Order[]
+}
+
+model InventoryRecord {
+  id           String    @id @default(uuid())
+  productId    String
+  product      Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId  String
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  batchLot     String?
+  qtyOnHand    Int       @default(0)
+  reorderPoint Int       @default(0)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
+
+  // (productId, warehouseId, batchLot) already indexes productId-only and
+  // (productId, warehouseId)-prefix lookups; warehouseId-only needs its own.
+  @@unique([productId, warehouseId, batchLot])
+  @@index([warehouseId])
+}
+
+// ---------- Cart & orders ----------
+
+model Cart {
+  id        String   @id @default(uuid())
+  userId    String?  @unique
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String?  @unique
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  items CartItem[]
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   Variant? @relation(fields: [variantId], references: [id])
+  qty       Int      @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  // Postgres treats each NULL as distinct, so this constraint doesn't dedupe
+  // rows where variantId is null — CartService.addItem() handles that case
+  // itself via an explicit findFirst. See apps/api/src/modules/cart/cart.service.ts.
+  @@unique([cartId, productId, variantId])
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  REFUND_REQUESTED
+  REFUNDED
+  CANCELLED
+}
+
+enum DeliveryMethod {
+  STANDARD
+  EXPRESS
+  SAME_DAY
+}
+
+model Order {
+  id              String         @id @default(uuid())
+  orderNumber     String         @unique
+  userId          String?
+  user            User?          @relation(fields: [userId], references: [id])
+  status          OrderStatus    @default(PENDING)
+  warehouseId     String?
+  warehouse       Warehouse?     @relation(fields: [warehouseId], references: [id])
+  subtotalUgx     Int
+  shippingFeeUgx  Int            @default(0)
+  discountUgx     Int            @default(0)
+  // FIN-FR-6/TAX-FR-1 (docs/SRS.md §21): Uganda VAT (18%) on the subtotal,
+  // broken out separately from totalUgx rather than folded silently into
+  // it — it's collected on behalf of URA, not ChrisPa's own revenue, and
+  // RevenueRecognitionService needs the figure on its own to credit a VAT
+  // Payable liability instead of Sales Revenue.
+  vatUgx          Int            @default(0)
+  totalUgx        Int
+  deliveryMethod  DeliveryMethod @default(STANDARD)
+  timeSlot        String?
+  paymentMethod   String?
+  shippingAddress Json
+  // Set only by the customer themselves (PATCH /orders/:id/confirm-receipt,
+  // OrdersController — the customer-facing controller's only write
+  // endpoint), never by staff — this is deliberately a separate signal from
+  // `status: DELIVERED` (which staff set). "Mutual consent" that the order
+  // is complete means both sides have signed off: staff confirmed delivery,
+  // and the customer confirmed the goods arrived in good condition. The
+  // printable receipt (PAY-FR-5) only unlocks once this is set.
+  deliveryConfirmedAt DateTime? @db.Timestamptz(3)
+  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
+
+  items                OrderItem[]
+  loyaltyLedgerEntries LoyaltyLedgerEntry[]
+  supportTickets       SupportTicket[]
+  paymentTransactions  PaymentTransaction[]
+
+  @@index([userId])
+  @@index([warehouseId])
+  @@index([status])
+}
+
+model OrderItem {
+  id           String   @id @default(uuid())
+  orderId      String
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+  variantId    String?
+  variant      Variant? @relation(fields: [variantId], references: [id])
+  qty          Int
+  unitPriceUgx Int
+
+  // MKT-FR-2/FIN-FR-7 (docs/SRS.md §21): snapshotted from Product at order
+  // creation time — deliberately NOT read live from Product at revenue-
+  // recognition time (order delivery, which can be days/weeks later), the
+  // same "snapshot, don't live-join" principle as Payslip/ActivityLog
+  // elsewhere in this schema. A vendor's commission rate or a product's
+  // cost changing after the sale must not rewrite what was actually earned
+  // on THIS order. platformCommissionUgx/vendorPayoutUgx are null until
+  // RevenueRecognitionService computes them at delivery (they don't exist
+  // for platform-owned items, which have no commission split at all).
+  vendorId              String?
+  vendor                Vendor?  @relation(fields: [vendorId], references: [id])
+  costUgxSnapshot       Int?
+  platformCommissionUgx Int?
+  vendorPayoutUgx       Int?
+  // Set once this line's vendorPayoutUgx has been included in a
+  // VendorPayout run — the guard against double-paying a vendor for the
+  // same sale across two overlapping payout periods. Null = recognized
+  // (platformCommissionUgx/vendorPayoutUgx set) but not yet paid out.
+  vendorPayoutId String?
+  vendorPayout   VendorPayout? @relation(fields: [vendorPayoutId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([vendorId])
+  @@index([vendorPayoutId])
+}
+
+// ---------- Marketing ----------
+
+enum CouponType {
+  PERCENT_OFF
+  FIXED_OFF
+  FREE_SHIPPING
+}
+
+model Coupon {
+  id         String     @id @default(uuid())
+  code       String     @unique
+  type       CouponType
+  value      Int
+  usageCount Int        @default(0)
+  isActive   Boolean    @default(true)
+  expiresAt  DateTime?  @db.Timestamptz(3)
+  createdAt  DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime   @updatedAt @db.Timestamptz(3)
+}
+
+model Bundle {
+  id             String   @id @default(uuid())
+  name           String
+  // Scalar array of Product IDs rather than a join table — no referential
+  // integrity, but bundles are a small, admin-curated marketing feature
+  // (FR-26.2) that doesn't yet need query-by-product-in-bundle. Revisit as
+  // a BundleItem join table if that changes.
+  productIds     String[]
+  bundlePriceUgx Int
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+}
+
+// FR-1.6/FR-26.4: footer newsletter signup — deliberately its own table, not
+// User.notifyPromotions, since the footer form is open to anonymous visitors
+// who may never create an account. isActive/unsubscribedAt (rather than a
+// hard delete on unsubscribe) keeps the history of who unsubscribed and
+// when, and lets a re-subscribe with the same email flip it back on instead
+// of violating the unique constraint. No actual campaign-sending exists yet
+// (same "capture the data ahead of the delivery mechanism" pattern as
+// User.notify* — see the comment there) — this is the capture side only.
+model NewsletterSubscriber {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  isActive       Boolean   @default(true)
+  subscribedAt   DateTime  @default(now()) @db.Timestamptz(3)
+  unsubscribedAt DateTime? @db.Timestamptz(3)
+}
+
+// FR-26.4 — one row per admin "Compose Newsletter" send. A record of what
+// was sent and to how many, not a draft/scheduling system — MarketingService
+// sends it immediately on creation (see the Notification model's comment for
+// how this fans out to email + in-app). recipientCount snapshots the active
+// subscriber count at send time rather than a live join, so this stays
+// accurate even as people later subscribe/unsubscribe.
+model NewsletterCampaign {
+  id              String   @id @default(uuid())
+  subject         String
+  body            String
+  recipientCount  Int      @default(0)
+  notifiedUserCount Int    @default(0)
+  sentAt          DateTime @default(now()) @db.Timestamptz(3)
+}
+
+// ---------- Loyalty ----------
+
+model LoyaltyAccount {
+  id            String       @id @default(uuid())
+  userId        String       @unique
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pointsBalance Int          @default(0)
+  tier          CustomerTier @default(STANDARD)
+
+  ledgerEntries LoyaltyLedgerEntry[]
+}
+
+model LoyaltyLedgerEntry {
+  id               String         @id @default(uuid())
+  loyaltyAccountId String
+  loyaltyAccount   LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id], onDelete: Cascade)
+  delta            Int
+  reason           String
+  orderId          String?
+  order            Order?         @relation(fields: [orderId], references: [id])
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+
+  @@index([loyaltyAccountId])
+}
+
+// ---------- Reviews, support, wishlist ----------
+
+model Review {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  body      String
+  photos    String[] @default([])
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([productId])
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model SupportTicket {
+  id        String       @id @default(uuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId   String?
+  order     Order?       @relation(fields: [orderId], references: [id])
+  body      String
+  status    TicketStatus @default(OPEN)
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
+
+  messages TicketMessage[]
+
+  @@index([userId])
+  @@index([orderId])
+}
+
+// The back-and-forth on a ticket once staff pick it up — either side
+// (customer or staff) can post one. No original FR-ID: FR-7.3 only covers
+// the initial submission; this is the admin review/response half, scoped
+// directly with the user (see support.service.ts).
+model TicketMessage {
+  id           String        @id @default(uuid())
+  ticketId     String
+  ticket       SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorUserId String
+  author       User          @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+  // Snapshotted at write time, not looked up live — same reasoning as
+  // ActivityLog.actorRole: a later role change shouldn't rewrite how a past
+  // message rendered (customer bubble vs. staff bubble).
+  authorRole UserRole
+  body       String
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([ticketId])
+  @@index([authorUserId])
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([userId, productId])
+  @@index([productId])
+}
+
+// ---------- CMS ----------
+
+enum CmsStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model CmsPage {
+  id        String    @id @default(uuid())
+  slug      String    @unique
+  title     String
+  body      String
+  status    CmsStatus @default(DRAFT)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+}
+
+model Banner {
+  id        String   @id @default(uuid())
+  imageUrl  String
+  linkUrl   String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model BlogPost {
+  id          String    @id @default(uuid())
+  slug        String    @unique
+  title       String
+  body        String
+  status      CmsStatus @default(DRAFT)
+  publishedAt DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+}
+
+// FR-19.2 / FR-1.6: the site-wide social links shown in both the storefront
+// footer and Account → Connected & Social — one admin-managed source of
+// truth for both surfaces (they used to be two separately hardcoded,
+// inconsistent lists of non-clickable labels). Follows Banner's
+// isActive/sortOrder shape, not CmsPage/BlogPost's draft/published
+// CmsStatus — a social link is either shown or it isn't, there's no
+// separate "draft" concept for it. `platform` is a free-text label rather
+// than an enum specifically so admins can add any platform (Twitter/X,
+// YouTube, LinkedIn, ...) without a schema change — this codebase has no
+// icon library, so it's rendered as a text label regardless of platform.
+model SocialMediaAccount {
+  id        String   @id @default(uuid())
+  platform  String
+  url       String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+// ---------- HR: Employee Profiles, Departments, Documents (Phase 1) ----------
+//
+// Employee is intentionally independent of User, with an optional 1:1 link —
+// HR needs to hold a record for someone in recruitment/onboarding before (or
+// even without) them ever getting a system login. Time & Attendance, Leave,
+// Performance, and Payroll (Phases 2-4) will hang off Employee, not User.
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+}
+
+// Drives the auto-logged audit trail in EmploymentHistoryEntry — see
+// EmployeesService in apps/api/src/modules/hr.
+enum EmploymentChangeType {
+  HIRED
+  PROMOTION
+  TRANSFER
+  SALARY_CHANGE
+  ROLE_CHANGE
+  SUSPENSION
+  REINSTATEMENT
+  TERMINATION
+  REHIRE
+}
+
+enum EmployeeDocumentType {
+  CONTRACT
+  ID_DOCUMENT
+  CERTIFICATE
+  PERFORMANCE_NOTE
+  OTHER
+}
+
+model Department {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  employees   Employee[]
+  jobPostings JobPosting[]
+  permissions DepartmentPermission[]
+}
+
+// One row per admin area already in the sidebar nav — mirrors the sections
+// in apps/admin/src/components/admin-shell.tsx exactly, so the policy
+// matrix always maps onto something real rather than an abstract list.
+enum PermissionResource {
+  PRODUCTS
+  ORDERS
+  INVENTORY
+  CUSTOMERS
+  MARKETING
+  CMS
+  SETTINGS
+  HR_DASHBOARD
+  HR_EMPLOYEES
+  HR_ATTENDANCE
+  HR_LEAVE
+  HR_SHIFTS
+  HR_RECRUITMENT
+  HR_PAYROLL
+  HR_PERFORMANCE
+}
+
+// A stored, editable policy record of what a department is "meant to
+// operate" — surfaced in the admin UI (Departments page) and intended as
+// the source of truth for that documentation/configuration. It does NOT
+// replace the API's actual access control: every admin endpoint is still
+// gated by the tested @Roles()/RolesGuard checks on UserRole (see
+// hr.module.ts and each admin controller) — that stays the real security
+// boundary. This table is deliberately a policy *record*, not an
+// enforcement engine, per the user's explicit choice — wiring live
+// per-request permission checks to this table instead of RolesGuard would
+// be a much larger, riskier change to the already-working authorization
+// system, and wasn't what was asked for.
+model DepartmentPermission {
+  id           String             @id @default(uuid())
+  departmentId String
+  department   Department         @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  resource     PermissionResource
+
+  canView    Boolean @default(false)
+  canCreate  Boolean @default(false)
+  canUpdate  Boolean @default(false)
+  canDelete  Boolean @default(false)
+  // For actions that aren't plain CRUD — approving leave, running payroll,
+  // transitioning an order's status, converting an applicant to an
+  // employee, etc.
+  canExecute Boolean @default(false)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([departmentId, resource])
+  @@index([departmentId])
+}
+
+model Employee {
+  id     String  @id @default(uuid())
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
+
+  employeeNumber String  @unique
+  firstName      String
+  lastName       String
+  personalEmail  String?
+  personalPhone  String?
+  dateOfBirth    DateTime? @db.Timestamptz(3)
+  gender         String?
+  // Uganda National ID Number — sensitive; access is restricted to
+  // OWNER/HR_MANAGER at the API layer (see hr.module.ts's @Roles()).
+  nationalIdNumber String?
+  address          String?
+  photoUrl         String?
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  jobTitle     String
+
+  employmentType   EmploymentType   @default(FULL_TIME)
+  employmentStatus EmploymentStatus @default(ACTIVE)
+  hireDate         DateTime         @db.Timestamptz(3)
+  terminationDate  DateTime?        @db.Timestamptz(3)
+
+  managerId     String?
+  manager       Employee?  @relation("EmployeeManager", fields: [managerId], references: [id])
+  directReports Employee[] @relation("EmployeeManager")
+
+  // Phase 4 (Payroll) fields — captured now since Employee is their natural
+  // home, not used by anything yet.
+  baseSalaryUgx Int?
+  nssfNumber    String?
+  tinNumber     String?
+
+  // Phase 2 (Leave): Uganda's Employment Act 2006 sets 21 working days/year
+  // as the statutory minimum paid annual leave — used as the default, but
+  // overridable per employee (e.g. a more generous contract).
+  annualLeaveDaysPerYear Int @default(21)
+
+  // Overtime calculation inputs — see calculateOvertimePay() in
+  // paye-nssf.util.ts. overtimeRateMultiplier is a plain multiplier (1.5 =
+  // "time and a half"), not a percentage.
+  standardHoursPerDay   Int   @default(8)
+  overtimeRateMultiplier Float @default(1.5)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  history       EmploymentHistoryEntry[]
+  documents     EmployeeDocument[]
+  timeEntries   TimeEntry[]
+  leaveRequests LeaveRequest[]
+  shifts        Shift[]
+  swapsRequested ShiftSwapRequest[] @relation("SwapRequestedBy")
+  swapsToCover   ShiftSwapRequest[] @relation("SwapCoverer")
+  goals               PerformanceGoal[]
+  feedbackReceived     PerformanceFeedback[]
+  reviews              PerformanceReview[]
+  convertedFromApplicant Applicant?
+  payslips             Payslip[]
+  allowances           EmployeeAllowance[]
+  salaryAdvances       SalaryAdvance[]
+  payrollAdjustments   PayrollAdjustment[]
+
+  @@index([departmentId])
+  @@index([managerId])
+  @@index([employmentStatus])
+}
+
+model EmploymentHistoryEntry {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  changeType    EmploymentChangeType
+  previousValue String?
+  newValue      String?
+  effectiveDate DateTime             @db.Timestamptz(3)
+  notes         String?
+  createdAt     DateTime             @default(now()) @db.Timestamptz(3)
+
+  @@index([employeeId])
+}
+
+model EmployeeDocument {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type       EmployeeDocumentType
+  title      String
+  fileUrl    String
+  expiresAt  DateTime?            @db.Timestamptz(3)
+  uploadedAt DateTime             @default(now()) @db.Timestamptz(3)
+
+  @@index([employeeId])
+}
+
+// ---------- HR Phase 2: Time & Attendance, Leave, Shift Scheduling ----------
+//
+// Self-service (clock in/out, request leave, view/swap own shifts) resolves
+// "which Employee is this?" via the caller's Employee.userId — see
+// EmployeesService.getByUserId() in apps/api/src/modules/hr. A staff User
+// with no linked Employee record can't use any of this.
+
+enum AttendanceSource {
+  WEB // no biometric/device integration yet — see docs/SRS.md §18.2
+}
+
+model TimeEntry {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  clockIn  DateTime          @db.Timestamptz(3)
+  clockOut DateTime?         @db.Timestamptz(3)
+  source   AttendanceSource  @default(WEB)
+  notes    String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([employeeId])
+  @@index([clockIn])
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  MATERNITY
+  PATERNITY
+  UNPAID
+  OTHER
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model LeaveRequest {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type      LeaveType
+  startDate DateTime  @db.Timestamptz(3)
+  endDate   DateTime  @db.Timestamptz(3)
+  reason    String?
+
+  status           LeaveRequestStatus @default(PENDING)
+  reviewedByUserId String?
+  reviewedBy       User?              @relation("LeaveReviewer", fields: [reviewedByUserId], references: [id])
+  reviewNotes      String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+enum ShiftStatus {
+  SCHEDULED
+  CANCELLED
+}
+
+model Shift {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  startAt DateTime    @db.Timestamptz(3)
+  endAt   DateTime    @db.Timestamptz(3)
+  role    String?
+  status  ShiftStatus @default(SCHEDULED)
+  notes   String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  swapRequests ShiftSwapRequest[]
+
+  @@index([employeeId])
+  @@index([startAt])
+}
+
+enum ShiftSwapStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model ShiftSwapRequest {
+  id      String @id @default(uuid())
+  shiftId String
+  shift   Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  requestedByEmployeeId String
+  requestedBy           Employee @relation("SwapRequestedBy", fields: [requestedByEmployeeId], references: [id])
+  coverEmployeeId       String
+  coverEmployee         Employee @relation("SwapCoverer", fields: [coverEmployeeId], references: [id])
+
+  status           ShiftSwapStatus @default(PENDING)
+  reviewedByUserId String?
+  reviewedBy       User?           @relation("SwapReviewer", fields: [reviewedByUserId], references: [id])
+  reason           String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([shiftId])
+  @@index([coverEmployeeId])
+}
+
+// ---------- HR Phase 3: Performance, Self-Service, Recruitment ----------
+//
+// Goals/Feedback/Reviews can be created by OWNER/HR_MANAGER *or* the target
+// employee's own manager (Employee.managerId) — resolved in
+// PerformanceService, not by role alone. See CLAUDE.md.
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  MISSED
+}
+
+model PerformanceGoal {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  title           String
+  description     String?
+  targetDate      DateTime?  @db.Timestamptz(3)
+  status          GoalStatus @default(NOT_STARTED)
+  progressPercent Int        @default(0)
+
+  createdByUserId String
+  createdBy       User     @relation(fields: [createdByUserId], references: [id])
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([employeeId])
+}
+
+// Lightweight, immutable, ongoing feedback notes — distinct from the
+// periodic formal PerformanceReview below.
+model PerformanceFeedback {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  givenByUserId String
+  givenBy       User   @relation(fields: [givenByUserId], references: [id])
+  note          String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([employeeId])
+}
+
+enum ReviewStatus {
+  DRAFT
+  SUBMITTED
+  ACKNOWLEDGED
+}
+
+model PerformanceReview {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  reviewerUserId String
+  reviewer       User   @relation(fields: [reviewerUserId], references: [id])
+
+  periodStart         DateTime     @db.Timestamptz(3)
+  periodEnd           DateTime     @db.Timestamptz(3)
+  rating              Int? // 1-5
+  strengths           String?
+  areasForImprovement String?
+  overallComments     String?
+  status              ReviewStatus @default(DRAFT)
+  acknowledgedAt      DateTime?    @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([employeeId])
+}
+
+enum JobPostingStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  FILLED
+}
+
+model JobPosting {
+  id           String @id @default(uuid())
+  title        String
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  description  String?
+  requirements String?
+  employmentType EmploymentType @default(FULL_TIME)
+  status         JobPostingStatus @default(DRAFT)
+
+  createdByUserId String?
+  createdBy       User?  @relation(fields: [createdByUserId], references: [id])
+
+  postedAt  DateTime? @db.Timestamptz(3)
+  closedAt  DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+
+  applicants Applicant[]
+
+  @@index([departmentId])
+  @@index([status])
+}
+
+enum ApplicantStage {
+  APPLIED
+  SCREENING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+model Applicant {
+  id           String     @id @default(uuid())
+  jobPostingId String
+  jobPosting   JobPosting @relation(fields: [jobPostingId], references: [id], onDelete: Cascade)
+
+  firstName String
+  lastName  String
+  email     String
+  phone     String?
+  resumeUrl String?
+  coverNote String?
+
+  stage ApplicantStage @default(APPLIED)
+  notes String? // internal HR notes, not shown to the applicant
+
+  // Set by RecruitmentService.convertToEmployee():
+  // "simplifies digital paperwork for new hires" is implemented as a
+  // one-click conversion into a real Employee record pre-filled from this
+  // applicant's data, rather than e-signature/document-workflow automation
+  // (a much bigger separate integration — see docs/SRS.md §18.3).
+  convertedEmployeeId String?   @unique
+  convertedEmployee   Employee? @relation(fields: [convertedEmployeeId], references: [id])
+
+  appliedAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([jobPostingId])
+  @@index([stage])
+}
+
+// ---------- HR Phase 4: Payroll ----------
+// Uganda PAYE bands + NSSF rates are hard-coded in
+// modules/hr/payroll/paye-nssf.util.ts using currently-published rates, per
+// user decision (see docs/SRS.md §18.4) — real financial/legal consequences,
+// so treat any rate change as needing accountant/tax-advisor sign-off before
+// a real payroll run, not a routine code change.
+
+enum PayrollPeriodStatus {
+  DRAFT // created, not yet computed
+  COMPUTED // payslips generated, still editable (re-run overwrites)
+  FINALIZED // locked — no further re-runs; advance-ledger balances committed here
+}
+
+enum PayrollPeriodType {
+  REGULAR
+  // A separate period type, not a PayrollAdjustment, because it has its own
+  // proration rule (see monthsEmployedInYear() in paye-nssf.util.ts) and
+  // deliberately excludes that month's allowances/overtime/bonus/advance
+  // recovery — a standalone prorated-basic-salary payout, taxed like normal
+  // pay. Uganda has no statutory 13th-month law; this documents it as a
+  // discretionary company benefit, per user decision.
+  THIRTEENTH_MONTH
+}
+
+model PayrollPeriod {
+  id     String @id @default(uuid())
+  // First-of-month date identifying the pay period, e.g. 2026-08-01. For
+  // THIRTEENTH_MONTH periods this is Dec 1 of the target year.
+  month  DateTime            @db.Timestamptz(3)
+  type   PayrollPeriodType   @default(REGULAR)
+  status PayrollPeriodStatus @default(DRAFT)
+
+  createdByUserId String
+  createdBy       User   @relation("PayrollPeriodCreatedBy", fields: [createdByUserId], references: [id])
+
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  finalizedAt DateTime? @db.Timestamptz(3)
+
+  payslips    Payslip[]
+  adjustments PayrollAdjustment[]
+
+  @@unique([month, type])
+}
+
+model Payslip {
+  id       String        @id @default(uuid())
+  periodId String
+  period   PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  // Snapshotted at computation time so a later salary change doesn't rewrite
+  // history — a payslip is a record of what was actually paid. For
+  // THIRTEENTH_MONTH payslips, basicSalaryUgx holds the *prorated* amount,
+  // not Employee.baseSalaryUgx directly.
+  basicSalaryUgx          Int
+  taxableAllowancesUgx    Int @default(0)
+  nonTaxableAllowancesUgx Int @default(0)
+  overtimeUgx             Int @default(0)
+  bonusUgx                Int @default(0)
+  // Taxable gross = basic + taxableAllowances + overtime + bonus; PAYE is
+  // computed on that figure. grossPayUgx here is the *display* total
+  // (taxable gross + nonTaxableAllowances) — see computePayslip().
+  grossPayUgx     Int
+  payeTaxUgx      Int
+  // NSSF is computed on basicSalaryUgx only, not the full gross — a
+  // documented simplification (see paye-nssf.util.ts) so allowances/bonuses
+  // don't silently change the statutory contribution; confirm with an
+  // accountant before a real payroll run.
+  nssfEmployeeUgx     Int
+  nssfEmployerUgx     Int
+  penaltyUgx          Int @default(0)
+  advanceRepaymentUgx Int @default(0)
+  netPayUgx           Int
+
+  computedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  advanceRepayments PayslipAdvanceRepayment[]
+
+  @@unique([periodId, employeeId])
+  @@index([employeeId])
+}
+
+enum AllowanceType {
+  HOUSING
+  TRANSPORT
+  LUNCH
+  MEDICAL
+  HARDSHIP
+  OTHER
+}
+
+// Recurring per-employee earning, applied to every regular payroll run
+// while active — housing/transport/lunch/etc. `taxable` controls whether it
+// feeds PAYE-chargeable income or is added straight to net pay.
+model EmployeeAllowance {
+  id         String        @id @default(uuid())
+  employeeId String
+  employee   Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       AllowanceType @default(OTHER)
+  label      String?
+  amountUgx  Int
+  taxable    Boolean       @default(true)
+  active     Boolean       @default(true)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([employeeId])
+}
+
+enum SalaryAdvanceStatus {
+  ACTIVE
+  PAID_OFF
+  CANCELLED
+}
+
+// A cash advance against future salary. balanceRemainingUgx only changes
+// when a payroll period carrying a repayment installment is *finalized*
+// (see PayrollService.finalize()) — re-running a not-yet-finalized period
+// recomputes the due installment against the current balance without
+// mutating it, so re-runs stay idempotent.
+model SalaryAdvance {
+  id                    String              @id @default(uuid())
+  employeeId            String
+  employee              Employee            @relation(fields: [employeeId], references: [id])
+  principalUgx          Int
+  balanceRemainingUgx   Int
+  monthlyInstallmentUgx Int
+  status                SalaryAdvanceStatus @default(ACTIVE)
+  issuedAt              DateTime            @default(now()) @db.Timestamptz(3)
+  approvedByUserId      String
+  approvedBy            User                @relation("AdvanceApprovedBy", fields: [approvedByUserId], references: [id])
+  note                  String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  repayments PayslipAdvanceRepayment[]
+
+  @@index([employeeId])
+}
+
+// Which advance(s) a given payslip's advanceRepaymentUgx total is made up
+// of — a payslip can repay more than one concurrent advance. Snapshotted
+// per payslip rather than recomputed at finalize time, so finalize() knows
+// exactly what to apply to each SalaryAdvance's balance without re-deriving
+// "what was due" (which could drift if adjustments changed in between).
+model PayslipAdvanceRepayment {
+  id        String        @id @default(uuid())
+  payslipId String
+  payslip   Payslip       @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  advanceId String
+  advance   SalaryAdvance @relation(fields: [advanceId], references: [id])
+  amountUgx Int
+
+  @@index([payslipId])
+  @@index([advanceId])
+}
+
+enum PayrollAdjustmentType {
+  BONUS
+  PENALTY
+  OVERTIME
+  OTHER_EARNING
+  OTHER_DEDUCTION
+}
+
+// One-off, per-period, per-employee line item — bonus, disciplinary
+// penalty, a confirmed overtime amount, or a catch-all earning/deduction.
+// Overtime is a special case: /hr/payroll/periods/:id/overtime-preview
+// computes a *suggested* amount from attendance data, but nothing is
+// applied to payroll until HR reviews it and creates (or edits, by
+// deleting and re-adding) an OVERTIME adjustment here with the confirmed
+// figure — the computed value is a suggestion, not an automatic charge.
+model PayrollAdjustment {
+  id       String        @id @default(uuid())
+  periodId String
+  period   PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  type      PayrollAdjustmentType
+  label     String
+  amountUgx Int
+  // Only meaningful for BONUS/OVERTIME/OTHER_EARNING — whether it feeds
+  // PAYE-chargeable income. PENALTY/OTHER_DEDUCTION are always post-tax
+  // deductions from net pay.
+  taxable Boolean @default(true)
+
+  createdByUserId String
+  createdBy       User   @relation("PayrollAdjustmentCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([periodId])
+  @@index([employeeId])
+}
+
+// AL-FR-1..3 (docs/SRS.md §19): unified activity/audit log covering both
+// customer and staff actions. `actorUserId` is deliberately a plain string,
+// NOT a `@relation` to User — an audit trail must survive independently of
+// the actor row it describes (see the "Delete Account" scrub-and-retain
+// convention already used for Order/Employee: the record outlives normal
+// lifecycle changes to the thing it references). No FK also means an
+// activity log write can never fail or block on a missing/since-anonymized
+// user row.
+enum ActivityActorType {
+  CUSTOMER
+  STAFF
+  SYSTEM
+}
+
+model ActivityLog {
+  id String @id @default(uuid())
+
+  // Snapshotted at write time, not looked up live — a later role change or
+  // account anonymization shouldn't rewrite what the log already says
+  // happened, same reasoning as Payslip snapshotting its figures.
+  actorUserId String?
+  actorRole   UserRole?
+  actorType   ActivityActorType
+
+  // Machine-readable action code (e.g. "PRODUCT_UPDATED", "ORDER_PLACED",
+  // "LOGIN") — see docs/SRS.md §19 for the catalog of codes currently
+  // emitted. `entityType`/`entityId` identify the affected row, if any.
+  action      String
+  entityType  String?
+  entityId    String?
+  description String
+  // Structured detail (e.g. { from, to } for a status change). Must never
+  // contain passwords, tokens, or other secrets — same rule as logging
+  // elsewhere in this codebase (see CLAUDE.md's observability notes).
+  metadata Json?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([actorUserId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================================
+// Financial & Accounting Management (docs/SRS.md §20, FIN-FR-*)
+// ============================================================
+// A real double-entry bookkeeping core for a multi-entity corporate group —
+// not a stub. It gets bookkeeping *mechanics* right (a JournalEntry's lines
+// must balance; financial statements are derived from posted ledger
+// balances, never stored redundantly) because those are universal,
+// jurisdiction-independent rules. It deliberately does NOT encode
+// jurisdiction-specific tax/GAAP/IFRS treatment, and — same standard as
+// `modules/hr/payroll/paye-nssf.util.ts` — any real (non-demo) use needs an
+// accountant/auditor's sign-off before it's relied on for actual filings.
+// Money fields use `Decimal`, not `Int`, unlike the UGX-only commerce side
+// of this schema — a multi-currency ledger must not round through floats or
+// assume a single currency's subunit conventions.
+
+// Self-referencing tree: the row with `parentEntityId: null` is the group's
+// ultimate parent. Each entity keeps its own chart of accounts and journal —
+// "separate books, linked back to the parent" per the original requirement.
+model LegalEntity {
+  id       String @id @default(uuid())
+  name     String @unique
+  code     String @unique
+  // ISO 4217 — the currency this entity's own books are kept in. Journal
+  // entries for this entity are denominated in this currency.
+  functionalCurrency String
+
+  parentEntityId String?
+  parentEntity   LegalEntity?  @relation("EntityHierarchy", fields: [parentEntityId], references: [id])
+  subsidiaries   LegalEntity[] @relation("EntityHierarchy")
+
+  // Current-rate method for consolidation (docs/SRS.md §20 FIN-FR-4): 1 unit
+  // of this entity's functionalCurrency = this many units of the group's
+  // reporting currency (see GroupSettings), re-priced manually — there is no
+  // live FX-rate feed wired in, the same "no external provider connected
+  // yet" constraint already documented for payments/email elsewhere in this
+  // codebase. A real close process should snapshot this per period rather
+  // than reading whatever it currently is; that period-snapshot mechanism
+  // is follow-up work — see the note on FinancialReportsService.
+  currentGroupFxRate Decimal @default(1) @db.Decimal(18, 6)
+
+  accounts      Account[]
+  journalEntries JournalEntry[]
+  fiscalPeriods  FiscalPeriod[]
+  // Inverse side of Account.counterpartyEntity — every intercompany account
+  // elsewhere in the group that names this entity as its counterparty.
+  counterpartyForAccounts Account[] @relation("IntercompanyCounterparty")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([parentEntityId])
+}
+
+// Singleton (single row) — the group's consolidated reporting currency.
+// A real table rather than a hard-coded constant so it's visible/editable
+// without a code change, but there is intentionally no UI/API to create a
+// second row — `FinancialReportsService` always reads the first one.
+model GroupSettings {
+  id                       String @id @default(uuid())
+  reportingCurrency        String @default("UGX")
+  updatedAt                DateTime @updatedAt @db.Timestamptz(3)
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+// Which of the three financial-statement sections a balance-sheet account's
+// *movements* fall under for the indirect-method cash flow statement (FIN-FR-3).
+// Only meaningful for ASSET/LIABILITY accounts; REVENUE/EXPENSE flow through
+// net income instead, and EQUITY movements are typically FINANCING.
+enum CashFlowCategory {
+  OPERATING
+  INVESTING
+  FINANCING
+}
+
+// Chart of accounts, per entity. `isIntercompany` + `counterpartyEntityId`
+// mark the specific due-to/due-from accounts IntercompanyService posts
+// against — FinancialReportsService eliminates exactly these accounts (and
+// only these) when building a consolidated statement, per FIN-FR-4/5.
+model Account {
+  id       String @id @default(uuid())
+  entityId String
+  entity   LegalEntity @relation(fields: [entityId], references: [id])
+
+  code String
+  name String
+  type AccountType
+
+  parentAccountId String?
+  parentAccount   Account?  @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  childAccounts   Account[] @relation("AccountHierarchy")
+
+  cashFlowCategory CashFlowCategory?
+
+  isIntercompany      Boolean @default(false)
+  counterpartyEntityId String?
+  counterpartyEntity   LegalEntity? @relation("IntercompanyCounterparty", fields: [counterpartyEntityId], references: [id])
+
+  isActive Boolean @default(true)
+
+  journalEntryLines JournalEntryLine[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([entityId, code])
+  @@index([entityId])
+  @@index([parentAccountId])
+  @@index([counterpartyEntityId])
+}
+
+enum FiscalPeriodStatus {
+  OPEN
+  CLOSED
+}
+
+// One row per entity per calendar month — same DRAFT/…/FINALIZED-style
+// lifecycle purpose as HR's PayrollPeriod: journal entries can only post
+// into an OPEN period for their entity, so a closed month's books can't be
+// silently altered after the fact.
+model FiscalPeriod {
+  id       String @id @default(uuid())
+  entityId String
+  entity   LegalEntity @relation(fields: [entityId], references: [id])
+
+  // First day of the month, UTC-midnight — matches `PayrollPeriod.month`'s
+  // convention elsewhere in this schema.
+  month  DateTime @db.Timestamptz(3)
+  status FiscalPeriodStatus @default(OPEN)
+  closedAt DateTime? @db.Timestamptz(3)
+
+  journalEntries JournalEntry[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([entityId, month])
+  @@index([entityId])
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+}
+
+// A single accounting transaction for one entity. `entryNumber` is
+// sequential *per entity* (derived the same "read the last one inside the
+// transaction" way as Order.orderNumber in checkout.service.ts — same
+// documented race caveat, acceptable at this data volume, a real sequence
+// object should replace it before high-concurrency posting matters).
+// `fxRateToGroupCurrency` snapshots the entity's rate at posting time so a
+// later rate change never rewrites a posted entry's historical translation
+// — same "snapshot, don't live-join" principle as Payslip and ActivityLog.
+model JournalEntry {
+  id       String @id @default(uuid())
+  entityId String
+  entity   LegalEntity @relation(fields: [entityId], references: [id])
+
+  fiscalPeriodId String
+  fiscalPeriod   FiscalPeriod @relation(fields: [fiscalPeriodId], references: [id])
+
+  entryNumber Int
+  date        DateTime @db.Timestamptz(3)
+  description String
+  status      JournalEntryStatus @default(POSTED)
+
+  fxRateToGroupCurrency Decimal @db.Decimal(18, 6)
+
+  // Links the two (or more) JournalEntry rows an intercompany transaction
+  // creates across different entities — null for an ordinary single-entity
+  // entry. See IntercompanyService.
+  intercompanyGroupId String?
+
+  createdByUserId String
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  lines JournalEntryLine[]
+
+  @@unique([entityId, entryNumber])
+  @@index([entityId, date])
+  @@index([fiscalPeriodId])
+  @@index([intercompanyGroupId])
+}
+
+// One debit-or-credit line. Exactly one of debitAmount/creditAmount is
+// non-zero — enforced in JournalService, not the database, since Prisma has
+// no portable CHECK-constraint syntax for "exactly one of two columns is
+// zero" — the same class of business-rule-in-code decision already made
+// throughout this schema (e.g. ALLOWED_TRANSITIONS for OrderStatus).
+model JournalEntryLine {
+  id             String @id @default(uuid())
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+
+  debitAmount  Decimal @default(0) @db.Decimal(18, 2)
+  creditAmount Decimal @default(0) @db.Decimal(18, 2)
+  memo         String?
+
+  @@index([journalEntryId])
+  @@index([accountId])
+}
+
+// ============================================================
+// Marketplace, Payments & Tax (docs/SRS.md §21, MKT-FR-*/PAY-FR-*/TAX-FR-*)
+// ============================================================
+
+enum VendorStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+// MKT-FR-1/2: a third-party seller in ChrisPa's marketplace. Every
+// commission calculation reads commissionRatePercent live at order-creation
+// time (recorded onto OrderItem then, per the snapshot note there) — a rate
+// change here only affects future orders, never past ones.
+model Vendor {
+  id                      String       @id @default(uuid())
+  name                    String
+  contactEmail            String?
+  contactPhone            String?
+  payoutMobileMoneyNumber String?
+  // Platform's cut, e.g. 20.00 = ChrisPa keeps 20%, vendor gets 80% of the
+  // sale price for their own items.
+  commissionRatePercent Decimal      @default(20) @db.Decimal(5, 2)
+  status                VendorStatus @default(ACTIVE)
+  createdAt             DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime     @updatedAt @db.Timestamptz(3)
+
+  products   Product[]
+  orderItems OrderItem[]
+  payouts    VendorPayout[]
+}
+
+enum VendorPayoutStatus {
+  PENDING
+  PAID
+}
+
+// MKT-FR-2: an aggregated, periodic payout run for one vendor — computed
+// from that vendor's DELIVERED OrderItems in the period (their
+// vendorPayoutUgx snapshots, already net of commission), not recomputed
+// live from current rates. Marking PAID is a manual admin action; there is
+// no real disbursement integration (no vendor-facing Mobile Money payout
+// API wired up) — same "no delivery channel" constraint noted elsewhere in
+// this codebase for things this project doesn't have a live provider for.
+model VendorPayout {
+  id            String             @id @default(uuid())
+  vendorId      String
+  vendor        Vendor             @relation(fields: [vendorId], references: [id])
+  periodStart   DateTime           @db.Timestamptz(3)
+  periodEnd     DateTime           @db.Timestamptz(3)
+  grossSalesUgx Int
+  commissionUgx Int
+  payoutUgx     Int
+  status        VendorPayoutStatus @default(PENDING)
+  paidAt        DateTime?          @db.Timestamptz(3)
+  createdAt     DateTime           @default(now()) @db.Timestamptz(3)
+
+  orderItems OrderItem[]
+
+  @@index([vendorId])
+}
+
+enum PaymentProvider {
+  FLUTTERWAVE
+}
+
+enum PaymentTransactionStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  REFUNDED
+  CHARGEBACK
+}
+
+// PAY-FR-1 (docs/SRS.md §21): one row per attempted gateway charge (and its
+// eventual refund/chargeback, tracked as a status transition on the same
+// row rather than a separate table, since a chargeback is a lifecycle event
+// of a specific transaction, not an independent record). `orderId` is
+// nullable because a Flutterwave charge is initiated before the order is
+// necessarily known to have succeeded — see PaymentsService.
+model PaymentTransaction {
+  id                     String                    @id @default(uuid())
+  orderId                String?
+  order                  Order?                    @relation(fields: [orderId], references: [id])
+  provider               PaymentProvider
+  // Our own idempotency key, sent to Flutterwave as tx_ref — generated
+  // before the order exists, which is how the webhook maps back to it.
+  providerReference      String                    @unique
+  providerTransactionId  String?
+  amountUgx              Int
+  currency               String                    @default("UGX")
+  status                 PaymentTransactionStatus  @default(PENDING)
+  failureReason          String?
+  // Gateway processing fee, or a chargeback fee once disputed — see PAY-FR-4.
+  feeUgx                 Int?
+  createdAt              DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime                  @updatedAt @db.Timestamptz(3)
+
+  @@index([orderId])
+  @@index([providerReference])
+}
+
+// FIN-FR-5 (multi-currency): every time LegalEntity.currentGroupFxRate is
+// changed, a row is written here first — "tracks exchange rate changes"
+// literally, not just "holds whatever the current rate is." The live rate
+// on LegalEntity stays the fast-path read for translation; this is the
+// audit trail of how it got there.
+model ExchangeRateHistory {
+  id             String   @id @default(uuid())
+  legalEntityId  String
+  fromRate       Decimal  @db.Decimal(18, 6)
+  toRate         Decimal  @db.Decimal(18, 6)
+  changedByUserId String
+  changedAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([legalEntityId])
+}
