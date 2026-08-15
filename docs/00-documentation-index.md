@@ -61,6 +61,13 @@ you want to know *how the system is built*, read 01–18; if you want to know *h
 | 18 | [Appendices](./18-appendices.md) | Appendices | Command reference, directory structure, env vars, consolidated checklist |
 | 19 | [Storefront User Manual](./19-storefront-user-manual.md) | — (not a template section; a genuine end-user guide) | How a customer actually uses the storefront — accounts, browsing/filters, cart/checkout, orders/receipts, account settings, getting help |
 | 20 | [Administrator User Manual](./20-admin-user-manual.md) | — (not a template section; a genuine end-user guide) | How staff actually use the admin console, organized by role — every section from Product Manager through Financial & Accounting |
+| 21 | [Data Flow Diagram](./21-data-flow-diagram.md) | — (not a template section; a supplementary technical artifact) | Level 0 context diagram + Level 1 diagrams for registration/OTP, login (incl. the suspend/delete gate), checkout, inventory, admin customer management, payroll — ASCII, not Mermaid (see the doc's own note on why) |
+| 22 | [Entity Relationship Diagram](./22-entity-relationship-diagram.md) | — (not a template section; a supplementary technical artifact) | Every FK relationship as one table row, plus small per-domain ASCII ER diagrams — complements [`03`](./03-database-design.md)'s narrative overview with the field/relationship detail it doesn't carry |
+| 23 | [Data Dictionary](./23-data-dictionary.md) | — (not a template section; a supplementary technical artifact) | Full field-by-field reference for every model (~60) and enum (~35) in `schema.prisma` |
+
+All three (21–23) carry their own "generated against commit `X`" freshness note — they're point-in-time
+artifacts, not auto-synced to the live schema; re-generate by hand after a schema change rather than trusting
+them blindly during a stale-looking review.
 
 ## Cross-cutting themes (appear in multiple documents — read once, applies everywhere)
 
@@ -137,10 +144,23 @@ you want to know *how the system is built*, read 01–18; if you want to know *h
   Posts` is the one CMS-domain model left read-only. `SocialMediaAccount.platform` is free text, not an enum,
   so any platform can be added without a schema change — see [`03`](./03-database-design.md),
   [`06`](./06-api-design-and-documentation.md), and [`16`](./16-user-and-administrator-procedures.md).
+- **Admin-triggered customer suspend/reactivate/delete** (net-new scope, not in the original SRS, added per
+  explicit user request) — `OWNER`/`STORE_MANAGER` can now suspend a customer account (reversible, with a
+  logged reason), reactivate it, or permanently delete it from the Customers (CRM) admin page.
+  `AuthService.completeLogin()` is the single enforcement point every login path (password, 2FA, Google,
+  WebAuthn) already funnels through; suspending also revokes every active refresh token immediately rather
+  than waiting out the current access token's TTL. See [`07`](./07-authentication-and-authorization.md),
+  [`21`](./21-data-flow-diagram.md)'s Admin Customer Management diagram, and
+  [`22`](./22-entity-relationship-diagram.md) for `User.suspendedAt`/`deletedAt`'s exact semantics.
+- **Netlify "Account credit usage exceeded" platform bug** — a live admin-site deploy was blocked by this
+  error despite the account's own API showing `{included: 300, used: 0}` (zero credits actually used, full
+  monthly allotment available). A documented, actively-reported Netlify-side bug, not a ChrisPa issue — see
+  [`13`](./13-incident-response-and-troubleshooting.md)'s incident log for the forum references and current
+  status.
 - **Three near-term priorities** stand out across this whole set as worth doing before the rest: push the
   repo to a remote, add database backups, and wire forgot-password/login-alert/staff-temp-password delivery
-  to the email+SMS services (registration OTP already uses real SMTP + Africa's Talking delivery — see
-  [`07`](./07-authentication-and-authorization.md) — the remaining work is integrating those same services
-  into the other three features, plus a production-grade transactional email API swap). See
+  to the email+SMS services (registration OTP already uses real Brevo (HTTP API, not SMTP — see
+  [`07`](./07-authentication-and-authorization.md) for why) + Africa's Talking delivery — the remaining work
+  is integrating those same services into the other three features). See
   [`18` Appendices, section E](./18-appendices.md#e-consolidated-checklists) for the full pre-production
   checklist.

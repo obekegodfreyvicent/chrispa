@@ -2,7 +2,10 @@
 
 Adapts template §9. Source of truth for the actual schema is always
 `apps/api/prisma/schema.prisma` — this document explains conventions and current state, it does not
-duplicate field-by-field detail (see `docs/SRS.md` §9 for the data-model narrative tied to FR-IDs).
+duplicate field-by-field detail (see `docs/SRS.md` §9 for the data-model narrative tied to FR-IDs, and
+[`22-entity-relationship-diagram.md`](./22-entity-relationship-diagram.md)/
+[`23-data-dictionary.md`](./23-data-dictionary.md) for the full relationship table and field-by-field
+reference this document deliberately doesn't grow to contain).
 
 ## Engine and access
 
@@ -68,6 +71,12 @@ won't touch it). The production database's three accounts were unlocked via a on
 that section for the pattern — but `seed.ts` itself still produces this locked state as-is; fixing it at the
 source (seeding a real secret, or defaulting these three to `twoFactorEnabled: false` like `dennis`/`brenda`)
 has not been done.
+
+**`User.suspendedAt`/`suspensionReason`** (added this session, commit `3b5fc6a`): a reversible,
+admin-triggered account hold, distinct from the existing terminal `deletedAt` — see
+[`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md) for the full feature and
+[`22-entity-relationship-diagram.md`](./22-entity-relationship-diagram.md) for exactly how it and `deletedAt`
+interact with `AuthService.completeLogin()`/`refresh()`.
 
 ## Schema inventory (grouped by domain, from `schema.prisma`)
 
