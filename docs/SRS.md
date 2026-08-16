@@ -312,8 +312,9 @@ Requirements are grouped to match the **Feature groups** already annotated in th
 **FR-9 — Sign Up** (`ChrisPa_SignUp_Wireframe.html`)
 - FR-9.1 Toggle between Email and Phone registration. **Implemented differently from the wireframe's
   either/or toggle**: email and phone are both required fields (Uganda `+256XXXXXXXXX` format,
-  `RegisterDto`), not a choice between them — because both channels get verified as part of account
-  creation (see FR-9.4a below), so both need to be on file rather than just one.
+  `RegisterDto`), not a choice between them — originally because both channels were verified as part of
+  account creation; phone verification is now temporarily dropped from that gate (see FR-9.4a below), but
+  the field stays mandatory since it's collected for shipping/staff-contact use regardless.
 - FR-9.2 Fields: Full Name, Email, Password (min. 8 chars, ≥1 number, strength/validation feedback).
   Implemented, plus the mandatory Phone field from FR-9.1.
 - FR-9.3 Mandatory Terms & Privacy Policy acceptance checkbox. Implemented (frontend-only gate — the API
@@ -323,18 +324,24 @@ Requirements are grouped to match the **Feature groups** already annotated in th
   **Facebook and Apple are not implemented.**
 - **FR-9.4a Registration OTP (added later, not in the original wireframe) — a hard verification gate, not an
   optional step.** `AuthService.register()` creates the account but returns no tokens — it issues a 6-digit
-  code to both the email (`OtpService`/`MailService`, generic SMTP via `nodemailer`) and the phone
-  (`OtpService`/`SmsService`, via Africa's Talking, the Uganda/East-Africa-native SMS gateway) and the
+  code to the email (`OtpService`/`MailService`, Brevo's transactional HTTP API) and the
   account cannot log in (`POST /auth/login` returns `{ requiresVerification: true, userId }` instead of
-  tokens) until `POST /auth/verify-otp` confirms **both** channels. Codes are 6 digits, single-use, hashed at
+  tokens) until `POST /auth/verify-otp` confirms the email code. Codes are 6 digits, single-use, hashed at
   rest (SHA-256, matching the refresh-token convention — see [`07`](./07-authentication-and-authorization.md)),
   expire after `OTP_TTL_MINUTES` (default 10), capped at 5 incorrect attempts, and rate-limited to one send
-  per 30 seconds per channel (`POST /auth/resend-otp`). If `SMTP_HOST`/`AT_API_KEY` aren't configured (e.g. a
-  fresh local dev checkout), both services fall back to logging the code server-side instead of failing the
+  per 30 seconds (`POST /auth/resend-otp`). If `SMTP_HOST`/Brevo credentials aren't configured (e.g. a
+  fresh local dev checkout), the service falls back to logging the code server-side instead of failing the
   request — the same "documented, graceful missing-integration fallback" pattern used elsewhere in this
   codebase, not a stub. The signup UI (`/signup`, and the embedded form at `/account`, FR-11.4) shows this as
-  an inline two-field "enter your email code / enter your phone code" step with independent resend buttons
-  immediately after submitting the signup form.
+  an inline "enter your email code" step with a resend button immediately after submitting the signup form.
+  **Phone/SMS verification is temporarily dropped from this gate** (`AuthService`, commit "Drop phone/SMS
+  from the registration OTP gate"): the only Africa's Talking credentials on file are `sandbox`, which never
+  delivers to a real phone number — only numbers explicitly registered as AT simulator test numbers — so
+  gating registration on SMS delivery was locking customers out of accounts they could never finish
+  verifying. Phone is still collected and stored (FR-9.1) for later use (shipping, staff contact, etc.); only
+  the verify-by-SMS step is skipped, in `register()`, `login()`'s gate, and `verifyOtp()`'s completion check
+  alike. `SmsService`/`OtpChannel.SMS` still exist and work (used for `phoneVerifiedAt`, which the schema
+  still tracks) — restore the phone step once a live, non-sandbox AT key is configured.
 - FR-9.5 Link to Log In for existing users. Implemented.
 
 **FR-10 — Forgot / Reset Password** (`ChrisPa_ForgotPassword_Wireframe.html`, `ChrisPa_ResetPassword_Wireframe.html`)

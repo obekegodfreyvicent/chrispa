@@ -159,7 +159,7 @@ itself.
 | WireGuard | No | Provider firewall / security groups | Network-level compliance requirement |
 | Traefik/Certbot | No | **Satisfied — Render/Netlify managed TLS, live today** | Custom edge routing needs outgrow the managed platforms |
 | LXC | No | Docker alone | Not foreseen |
-| iRedMail | No — **satisfied: Brevo HTTP API + Africa's Talking sandbox, both configured and confirmed delivering in production** | Registration OTP delivery now works end-to-end (~8s, both channels); Africa's Talking still needs a live (non-sandbox) account before real customer phones can receive SMS | Move AT off sandbox before depending on real SMS delivery; wire forgot-password/login-alerts/temp-password to the same services when those features are built |
+| iRedMail | No — **satisfied: Brevo HTTP API, configured and confirmed delivering in production** | Registration OTP delivery works end-to-end (~8s) on email; the SMS channel is coded (Africa's Talking) but temporarily excluded from the registration gate since only sandbox AT credentials are on file, which can't reach a real phone | Move AT off sandbox and restore the phone-verification step; wire forgot-password/login-alerts/temp-password to the same services when those features are built |
 | Zulip/Slack | No | Whatever the team already uses | N/A — not a platform concern |
 | Pi-hole | No | Public DNS via registrar | Not foreseen |
 | Nextcloud | No | Object storage for product/user media | Before production (media survives redeploy) |

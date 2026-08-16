@@ -18,17 +18,28 @@ code comments in `apps/api/src/modules/auth` (especially `two-factor.service.ts`
 - Access tokens are short-lived (15 min, `JWT_ACCESS_TTL`); refresh tokens live 30 days
   (`JWT_REFRESH_TTL_DAYS`) and rotate on each use.
 
-## Registration OTP (email + SMS)
+## Registration OTP (email; SMS coded but temporarily off)
 
 `POST /auth/register` (FR-9) creates the `User` row but deliberately returns **no tokens** — it's a hard
-verification gate, not a self-completing signup. `OtpService.issue()` sends a 6-digit code to both channels
-in parallel: email via `MailService` (Brevo's transactional HTTP API — **not SMTP**, see the production-status
-callout below for why) and phone via `SmsService` (Africa's Talking, the Uganda/East-Africa-native SMS
-gateway chosen over Twilio for this project). The account cannot log in
+verification gate, not a self-completing signup. `OtpService.issue()` sends a 6-digit code to the email
+channel: email via `MailService` (Brevo's transactional HTTP API — **not SMTP**, see the production-status
+callout below for why). The account cannot log in
 (`POST /auth/login` returns `{ requiresVerification: true, userId }` in place of tokens) until
-`POST /auth/verify-otp` confirms **both** channels — `AuthService.verifyOtp()` is the only path that
+`POST /auth/verify-otp` confirms the email code — `AuthService.verifyOtp()` is the only path that
 actually completes that login, mirroring `changePassword()`'s "issue tokens right after the gate that was
 blocking them clears" shape.
+
+**Phone/SMS is intentionally excluded from this gate right now** (per user decision — commit "Drop
+phone/SMS from the registration OTP gate"): the only Africa's Talking credentials on file are `sandbox`,
+which never delivers to a real phone number — only numbers explicitly registered as AT simulator test
+numbers — so gating registration on it was locking real customers out of accounts they could never finish
+verifying. Phone is still collected and stored at signup (FR-9.1) for later use (shipping, staff contact,
+etc.); only the verify-by-SMS step is skipped, in `register()` (no SMS is issued), `login()`'s
+`requiresVerification` gate (checks `emailVerifiedAt` only), and `verifyOtp()`'s completion check (same).
+`SmsService`/`OtpChannel.SMS` and the `phoneVerifiedAt` column still exist and still work end-to-end — they're
+just not wired into the gate. Restore the phone step (re-add the `SmsService` call in `register()` and the
+`user.phone && !user.phoneVerifiedAt` checks in `login()`/`verifyOtp()`) once a live, non-sandbox AT key is
+configured — the code comments in `auth.service.ts` mark exactly where.
 
 Codes are hashed at rest with the same `createHash('sha256')` convention as refresh tokens (see below) —
 overkill-adjacent for a 6-digit value, but free given the code is already rate-limited, short-lived, and
@@ -39,16 +50,15 @@ independent of the controller-level `@Throttle` (`POST /auth/resend-otp`).
 **Neither `MailService` nor `SmsService` is a stub** — both are real, working integrations, gated on their
 own env vars (`BREVO_API_KEY`/`EMAIL_FROM_ADDRESS`/`EMAIL_FROM_NAME`, `AT_USERNAME`/`AT_API_KEY`) with a
 documented, graceful fallback: if unset (a fresh local dev checkout, or a deliberately provider-less
-environment), both services log the would-be message instead of throwing, so registration still works
-end-to-end in dev without ever sending a real email or SMS. This is a materially different state from the "no
-delivery provider exists" gap this section used to describe — see Known gaps below for what's *actually*
-still blocked on that concern (forgot-password, login-alert delivery, admin invites, staff temp-password
-delivery — none of them call `MailService`/`SmsService` yet, but the services themselves are no longer the
-missing piece).
+environment), both services log the would-be message instead of throwing. `SmsService` is currently only
+exercised outside the registration gate (`phoneVerifiedAt` can still be set via `POST /auth/verify-otp` with
+`channel: SMS` if something else issues that code by hand) — see Known gaps below for what's *actually*
+still blocked on the "no delivery provider" concern (forgot-password, login-alert delivery, admin invites,
+staff temp-password delivery — none of them call `MailService`/`SmsService` yet).
 
-> **Production status (confirmed, working)**: both channels are live in production, verified end-to-end (a
-> real registration returns `201` in ~8 seconds with both codes delivered). Getting here took three real
-> fixes, in order:
+> **Production status (confirmed, working)**: email delivery is live in production, verified end-to-end (a
+> real registration returns `201` in ~8 seconds with the code delivered). Getting here took three real
+> fixes and one later scope change, in order:
 >
 > 1. **Neither provider was configured at all** (initial state) — both services silently logged codes to
 >    Render's server logs instead of sending them, so every registration created a real account with no way
@@ -66,10 +76,14 @@ missing piece).
 >    provider error (as opposed to "not configured", which was already handled) crashed the whole request
 >    with a bare `500`, after the `User` row was already committed — an orphaned unverified account and a
 >    failed request, confirmed live when Africa's Talking briefly rejected a freshly-generated sandbox API key
->    with `401` (new keys take a few minutes to propagate). Switched to `Promise.allSettled` with per-channel
->    error logging, so a delivery failure on either channel degrades gracefully instead of crashing —
->    registration still succeeds, and `POST /auth/resend-otp` gives a real second chance once whatever caused
->    the failure clears.
+>    with `401` (new keys take a few minutes to propagate). Switched to `Promise.allSettled` (now just a `try`/
+>    `catch` around the single email dispatch) with error logging, so a delivery failure degrades gracefully
+>    instead of crashing — registration still succeeds, and `POST /auth/resend-otp` gives a real second chance
+>    once whatever caused the failure clears.
+> 4. **Scope change, not a bug**: even with AT correctly configured, its `sandbox` credentials structurally
+>    cannot deliver SMS to a real customer phone, so the phone-code step was silently locking every real
+>    customer out of an account they could never finish verifying. The registration/login gate was narrowed
+>    to email-only until a live AT key is available — see above.
 
 **"Sign in/up with Google" (FR-8.4/FR-9.4)** is the one path that skips registration OTP entirely — Google
 has already verified the email server-side, which is the same authority `emailVerifiedAt` otherwise records.
@@ -85,9 +99,10 @@ renders nothing at all if `NEXT_PUBLIC_GOOGLE_CLIENT_ID` isn't set (same env var
 
 Frontend: `/login`, `/signup`, and the embedded forms at `/account` (FR-11.4, storefront only) all wire up
 identically — a shared `OtpVerify` component (`apps/storefront/src/components/auth/otp-verify.tsx`) renders
-the two-channel code-entry step, reused for both the signup flow (codes already sent by `register()`) and
+the single email code-entry step (the phone field was removed alongside the backend gate change above),
+reused for both the signup flow (code already sent by `register()`) and
 the login flow (an existing account that never finished verifying — `login()`'s `requiresVerification` gate
-re-issues fresh codes on mount, since the original ones may be long expired), and a shared
+re-issues a fresh code on mount, since the original one may be long expired), and a shared
 `GoogleSignInButton` (`google-signin-button.tsx`) renders Google Identity Services' own button and posts its
 credential straight to `POST /auth/google`.
 
@@ -207,6 +222,10 @@ independently rejected by `JwtAuthGuard`/`RolesGuard` on the API regardless of w
 
 ## Known gaps
 
+- **Phone/SMS verification is temporarily out of the registration/login gate** — see the Registration OTP
+  section above. `SmsService`/Africa's Talking work and are configured, but only with `sandbox` credentials,
+  which can't reach a real customer phone; restoring the phone step is blocked on getting a live AT account,
+  not on any code work.
 - **No forgot-password flow** — `/forgot-password`/`/reset-password` are disabled UI stubs, no API endpoint.
   No longer blocked on a missing delivery provider (`MailService`/`SmsService` exist and are real, see
   above) — it's a distinct feature that hasn't been wired to them, a smaller gap than it used to be. Until

@@ -6,7 +6,7 @@ blocks, not Mermaid — `md_to_docx.py` (the script that generates this document
 blocks to literal monospace text but does not render Mermaid syntax as an actual diagram, so Mermaid would only
 work in the `.md` and show as broken syntax in Word. ASCII art renders identically and correctly in both.
 
-**Freshness note**: generated against commit `3b5fc6a` (2026-08-16), the schema/service layer as of that
+**Freshness note**: generated against commit `a29e0cf` (2026-08-16), the schema/service layer as of that
 commit. This is a point-in-time artifact, not auto-synced to the live codebase — re-generate by hand after a
 schema or major flow change, the same convention as
 [`22-entity-relationship-diagram.md`](./22-entity-relationship-diagram.md) and
@@ -69,38 +69,42 @@ see the Registration & OTP diagram below for where they sit.
  │ Customer ├───────────────────────────────────>  1.0 Register    │
  └────┬─────┘                                    │  (AuthService)  │
       │                                          └──┬───────────┬──┘
-      │  4. enter email code + phone code           │           │
-      │     (2 separate calls)                      │2. create  │3. issue OTP
-      v                                              v           v
+      │  4. enter email code                        │           │
+      v                                              │2. create  │3. issue OTP (email only)
  ┌──────────┐                              ╔══════════╗   ┌─────────────────┐
  │ 4.0      │                              ║   User    ║   │  2.0 Issue OTP   │
  │ Verify   ├─────────────────────────────>║  (D1)     ║   │  (OtpService)    │
- │ OTP      │  5. set emailVerifiedAt /    ╚══════════╝   └──┬────────────┬──┘
- └────┬─────┘     phoneVerifiedAt                            │            │
-      │                                          6. code hash│            │6. code hash
-      │ 7. once BOTH verified: issue tokens                  v            v
-      v                                              ╔══════════════╗  (same store,
- ┌──────────┐                                        ║  OtpCode (D2) ║  per channel)
+ │ OTP      │  5. set emailVerifiedAt      ╚══════════╝   └──────────┬──────┘
+ └────┬─────┘                                                        │
+      │                                                  6. code hash│
+      │ 7. once verified: issue tokens                               v
+      v                                              ╔══════════════╗
+ ┌──────────┐                                        ║  OtpCode (D2) ║
  │ Customer │<──────────────── tokens ────────────────╚══════════════╝
  └──────────┘
 
-                    3a. email          3b. SMS
-                  ┌──────────┐       ┌──────────┐
-                  │  Brevo    │       │ Africa's  │
-                  │  HTTP API │       │ Talking   │
-                  └──────────┘       └──────────┘
+                    3a. email
+                  ┌──────────┐
+                  │  Brevo    │
+                  │  HTTP API │
+                  └──────────┘
 ```
 
-- **1.0 Register**: `POST /auth/register` creates the `User` row, then dispatches both OTP channels via
-  `Promise.allSettled` — a delivery failure on either channel is logged but never crashes the request (a real
-  incident this session, see `13-incident-response-and-troubleshooting.md` #4).
+- **1.0 Register**: `POST /auth/register` creates the `User` row, then dispatches the email OTP channel only
+  — a delivery failure is logged but never crashes the request (a real incident this session, see
+  `13-incident-response-and-troubleshooting.md` #4). SMS is intentionally not issued here (temporary, per user
+  decision): the only Africa's Talking credentials on file are `sandbox`, which never delivers to a real phone
+  number, so gating registration on it was locking customers out of accounts they could never finish
+  verifying — see `07-authentication-and-authorization.md` and the SRS's FR-9.4a. Phone is still collected and
+  stored (FR-9.1) for later use; only the verify-by-SMS step is skipped.
 - **2.0 Issue OTP**: generates a 6-digit code, hashes it (`OtpCode.codeHash`, same `sha256` convention as
-  refresh tokens), and calls the matching delivery service.
-- **3a/3b**: `MailService` calls Brevo's transactional HTTP API (not SMTP — Render's free-tier platform
-  blocks outbound SMTP ports, see incident #3); `SmsService` calls Africa's Talking. Both no-op-and-log
-  instead of throwing if unconfigured.
-- **4.0 Verify OTP**: `POST /auth/verify-otp`, once per channel; `completeLogin()` only issues tokens once
-  both `emailVerifiedAt` and `phoneVerifiedAt` (when a phone is on file) are set.
+  refresh tokens), and calls `MailService`.
+- **3a**: `MailService` calls Brevo's transactional HTTP API (not SMTP — Render's free-tier platform
+  blocks outbound SMTP ports, see incident #3). No-ops-and-logs instead of throwing if unconfigured.
+  `SmsService`/Africa's Talking still exist in the codebase and still work for other purposes, just not wired
+  into this gate right now — restore the phone step once a live (non-sandbox) AT key is configured.
+- **4.0 Verify OTP**: `POST /auth/verify-otp` for the email channel; `completeLogin()` issues tokens once
+  `emailVerifiedAt` is set. `phoneVerifiedAt` is no longer part of this gate.
 - "Sign in/up with Google" skips this entire flow — Google's own verification substitutes for it.
 
 ## Level 1 — Authentication & Login

@@ -38,9 +38,10 @@ signed in or not) and choose **Create an Account**, or go directly to `/signup`.
 ![The Sign Up screen — Full Name, Email, Phone, Password, Terms & Privacy, and Continue with Google](./screenshots/storefront-signup.png)
 
 After submitting, your account exists but isn't signed in yet — you'll land on a **Verify your account**
-step with two boxes, one for a 6-digit code emailed to you and one texted to your phone. Enter both (in
-either order; "Resend code" is there if one doesn't arrive within a minute or so) and you're signed in
-automatically the moment the second one's confirmed. Both codes expire after 10 minutes.
+step with a single box for a 6-digit code emailed to you ("Resend code" is there if it doesn't arrive within
+a minute or so). Enter it and you're signed in automatically. The code expires after 10 minutes. (A phone
+verification step existed here previously but is temporarily switched off — SMS delivery isn't live yet — so
+your phone number is collected but not verified at signup.)
 
 **Or, skip all of that** — click **Continue with Google** instead of filling in the form. Since Google's
 already confirmed your email address, this creates (or signs into, if you've used it here before) your
@@ -48,7 +49,7 @@ account immediately, no password and no verification codes needed.
 
 ### Log in
 
-Enter your email or phone and password. If you signed up before finishing the email/phone verification
+Enter your email or phone and password. If you signed up before finishing the email verification
 above, you'll be sent straight back to that **Verify your account** step instead of being let in. If your
 account has Two-Factor Authentication turned on, you'll be asked for a 6-digit code from your authenticator
 app next.
@@ -232,7 +233,7 @@ available yet — think of this page as your running rewards statement for now, 
 - **Change Password**: enter your current password and a new one.
 - **Notification Preferences**: toggle Order Updates (SMS), Order Updates (Email), Promotions & Newsletter,
   and Push Notifications. (These save your preference; nothing sends on any of these toggles today — email
-  and SMS delivery are only wired up for the verification codes you get at signup and for newsletter
+  and SMS delivery are only wired up for the email verification code you get at signup and for newsletter
   campaigns (see [Notifications](#notifications) below), not for order-update/push triggers yet, and there's
   no push notification service connected at all.)
 - **Download My Data**: get a JSON file of everything ChrisPa holds about you — profile, addresses, orders,
@@ -312,7 +313,7 @@ team publishes — title + text body, no rich formatting — rendered at `/pages
 
 | Area | Available now | Coming soon |
 |---|---|---|
-| Login | Password, 2FA, biometric/passkey, Google sign-in/sign-up, email+SMS verification at signup | Forgot/reset password, Facebook/Apple sign-in, linking a social login to an existing account |
+| Login | Password, 2FA, biometric/passkey, Google sign-in/sign-up, email verification at signup (SMS verification coded but temporarily off — sandbox-only AT credentials) | Forgot/reset password, Facebook/Apple sign-in, linking a social login to an existing account, restoring phone verification |
 | Checkout payment | Cash on Delivery | Mobile Money, Card |
 | Product page | Photos, size selection, Add to Cart, Wishlist | "Buy Now" shortcut, photo zoom/click-to-swap |
 | Order actions | Tracking, receipt (after delivery + your confirmation) | Cancel Order, Request Return/Refund |

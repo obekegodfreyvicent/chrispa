@@ -45,7 +45,7 @@ unless they're compound/notable.
 | notifyLoginAlerts | Boolean | No | false | Delivered in-app only, no SMS/email provider |
 | mustChangePassword | Boolean | No | false | Set on staff temp-password issuance; enforced globally by `MustChangePasswordGuard` |
 | emailVerifiedAt | DateTime | Yes | — | Set once registration OTP (email) is confirmed |
-| phoneVerifiedAt | DateTime | Yes | — | Set once registration OTP (SMS) is confirmed |
+| phoneVerifiedAt | DateTime | Yes | — | Set once registration OTP (SMS) is confirmed — SMS verification is temporarily excluded from the registration/login gate (sandbox-only Africa's Talking credentials), so this stays unset for most accounts today |
 | googleId | String | Yes | — | `@unique`; set on first Google sign-in |
 | suspendedAt | DateTime | Yes | — | Admin-triggered, reversible hold — see `CrmService.suspend()`. Blocks login at `completeLogin()` |
 | suspensionReason | String | Yes | — | Free text, shown in the admin audit log |

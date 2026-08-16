@@ -63,8 +63,9 @@ Key behaviors:
   dashboard as before. Both the standalone and embedded Log In/Create Account forms share two components
   from `components/auth/`: `GoogleSignInButton` (loads Google Identity Services' script, renders its own
   button, posts the resulting ID token to `POST /auth/google`; renders nothing if
-  `NEXT_PUBLIC_GOOGLE_CLIENT_ID` isn't set) and `OtpVerify` (the two-channel email/phone code-entry step
-  `register()`'s registration-OTP hard gate requires before an account can log in — see
+  `NEXT_PUBLIC_GOOGLE_CLIENT_ID` isn't set) and `OtpVerify` (the email code-entry step
+  `register()`'s registration-OTP hard gate requires before an account can log in — phone/SMS verification
+  is temporarily dropped from this gate, see
   [`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md) — reused for both a
   fresh signup and an existing account that never finished verifying, which `login()` reports as
   `{ requiresVerification: true, userId }`).
