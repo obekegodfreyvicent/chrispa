@@ -96,26 +96,33 @@ export class AuthService {
     });
 
     // allSettled, not all: the account row above is already committed, so a
-    // delivery failure on either channel (provider outage, bad credentials,
-    // network issue — as opposed to "not configured", which OtpService
-    // already handles without throwing) must not crash this request and
-    // leave the customer stuck on an orphaned unverified account with a
-    // bare 500. The OTP code itself is still persisted either way, so
-    // "Resend code" gives them a real second chance once the provider issue
-    // is fixed.
-    const results = await Promise.allSettled([
-      this.otp.issue(user.id, OtpChannel.EMAIL, dto.email),
-      this.otp.issue(user.id, OtpChannel.SMS, dto.phone),
-    ]);
-    for (const result of results) {
-      if (result.status === 'rejected') {
-        this.logger.error(`Registration OTP dispatch failed for user ${user.id}: ${result.reason}`);
-      }
+    // delivery failure (provider outage, bad credentials, network issue — as
+    // opposed to "not configured", which OtpService already handles without
+    // throwing) must not crash this request and leave the customer stuck on
+    // an orphaned unverified account with a bare 500. The OTP code is still
+    // persisted either way, so "Resend code" gives a real second chance once
+    // the provider issue is fixed.
+    //
+    // SMS is intentionally NOT issued here (temporary, per user decision):
+    // the only Africa's Talking credentials on file are `sandbox`, which
+    // never delivers to a real phone — only numbers explicitly registered as
+    // simulator test numbers in the AT dashboard. Gating registration on a
+    // channel that structurally cannot reach a real customer was locking
+    // people out of their own accounts. Phone is still collected and stored
+    // (FR-9.1) for later use (shipping, staff contact, etc.) — only the
+    // verify-by-SMS step is skipped, both here and in login()/verifyOtp()'s
+    // gate below. Once a live (non-sandbox) AT key is configured, re-add
+    // `this.otp.issue(user.id, OtpChannel.SMS, dto.phone)` here and restore
+    // the `user.phone && !user.phoneVerifiedAt` checks below.
+    try {
+      await this.otp.issue(user.id, OtpChannel.EMAIL, dto.email);
+    } catch (err) {
+      this.logger.error(`Registration OTP dispatch failed for user ${user.id}: ${err}`);
     }
 
     return {
       userId: user.id,
-      message: 'Enter the codes sent to your email and phone to finish creating your account.',
+      message: 'Enter the code sent to your email to finish creating your account.',
     };
   }
 
@@ -132,11 +139,10 @@ export class AuthService {
     // self-registration, and have no OTP flow to satisfy). A Google-created
     // account always has emailVerifiedAt set and no phone on file, so it
     // never trips this on the password-login path either — see
-    // googleLogin(), which bypasses this check entirely.
-    if (
-      user.role === UserRole.CUSTOMER &&
-      (!user.emailVerifiedAt || (user.phone && !user.phoneVerifiedAt))
-    ) {
+    // googleLogin(), which bypasses this check entirely. Phone verification
+    // is intentionally not part of this gate right now — see the SMS note in
+    // register() above (sandbox AT credentials can't reach a real phone).
+    if (user.role === UserRole.CUSTOMER && !user.emailVerifiedAt) {
       return { requiresVerification: true, userId: user.id };
     }
 
@@ -188,8 +194,8 @@ export class AuthService {
       data: { [field]: new Date() },
     });
 
-    const stillNeedsPhone = !!user.phone && !user.phoneVerifiedAt;
-    if (!user.emailVerifiedAt || stillNeedsPhone) {
+    // Phone deliberately excluded from this gate — see register()'s SMS note.
+    if (!user.emailVerifiedAt) {
       return { verified: { email: !!user.emailVerifiedAt, phone: !!user.phoneVerifiedAt } };
     }
 
