@@ -356,44 +356,135 @@ async function main() {
 
   // Shipping zones (per user decision, not in the original SRS) — replaces
   // the old flat per-delivery-method fee table; CheckoutService now prices
-  // by destination + delivery method via ShippingZonesService. Two starter
-  // zones so checkout works out of the box; an admin can add/edit more via
-  // Admin → Shipping Zones. "Rest of Uganda" is the isDefault fallback for
-  // any city that doesn't match Kampala Metro's town list — deliberately
-  // not "Kampala Metro" itself, so an unrecognized/misspelled town gets
-  // priced as upcountry (safer to overcharge shipping than undercharge it)
-  // rather than silently defaulting to Kampala's cheaper rates.
-  const kampalaZone = await prisma.shippingZone.findFirst({ where: { name: 'Kampala Metro' } });
-  if (!kampalaZone) {
-    await prisma.shippingZone.create({
-      data: {
-        name: 'Kampala Metro',
-        towns: [
-          'Kampala', 'Nakawa', 'Kawempe', 'Makindye', 'Rubaga', 'Central Division',
-          'Ntinda', 'Bugolobi', 'Muyenga', 'Kololo', 'Nakasero', 'Naalya', 'Kyanja',
-          'Kisaasi', 'Bukoto', 'Kabalagala', 'Namuwongo',
-        ],
-        isDefault: false,
-        standardFeeUgx: 0,
-        expressFeeUgx: 8000,
-        sameDayFeeUgx: 12000,
-        sortOrder: 0,
-      },
-    });
-  }
-  const upcountryZone = await prisma.shippingZone.findFirst({ where: { name: 'Rest of Uganda' } });
-  if (!upcountryZone) {
-    await prisma.shippingZone.create({
-      data: {
-        name: 'Rest of Uganda',
-        towns: [],
-        isDefault: true,
-        standardFeeUgx: 15000,
-        expressFeeUgx: 25000,
-        sameDayFeeUgx: 35000,
-        sortOrder: 1,
-      },
-    });
+  // by destination + delivery method via ShippingZonesService. An admin can
+  // add/edit/remove any of these via Admin → Shipping Zones at any time —
+  // this seed only sets sensible starting values.
+  //
+  // "Rest of Uganda" is the isDefault fallback for any city that matches
+  // none of the named zones below — deliberately not "Kampala Metro"
+  // itself, so an unrecognized/misspelled town gets priced conservatively
+  // rather than silently defaulting to Kampala's cheaper rates. It's
+  // intentionally left untouched if it already exists (upsert-by-name,
+  // create-only) rather than folded into the new regional zones below —
+  // this is seed data, not a one-off migration script, so it must stay
+  // idempotent and never overwrite whatever an admin has since edited it to
+  // in a real deployment.
+  //
+  // The five region zones below (per user decision, replacing what used to
+  // be a single flat "upcountry" rate for all of non-Kampala Uganda) price
+  // Standard/Express/Same-day so they scale with rough real-world distance/
+  // travel time from the Kampala Central warehouse — Central (Rest) is
+  // nearest and cheapest, Northern is farthest and most expensive, and no
+  // two regions share the same figures. Town lists are representative, not
+  // exhaustive — an admin can add more via the same "towns" field. Northern
+  // Uganda's Same-day is left unavailable (null) rather than just
+  // expensive: Gulu/Arua/Kitgum are realistically 5-8 hours' drive one way,
+  // past what a same-day promise can honestly cover — the other four zones
+  // still price it (higher than Kampala's), matching the earlier decision
+  // that Same-day isn't hard-blocked outside Kampala at the code level,
+  // just priced/offered per zone at the admin's judgment.
+  const shippingZones: Array<{
+    name: string;
+    towns: string[];
+    isDefault: boolean;
+    standardFeeUgx: number | null;
+    expressFeeUgx: number | null;
+    sameDayFeeUgx: number | null;
+    sortOrder: number;
+  }> = [
+    {
+      name: 'Kampala Metro',
+      towns: [
+        'Kampala', 'Nakawa', 'Kawempe', 'Makindye', 'Rubaga', 'Central Division',
+        'Ntinda', 'Bugolobi', 'Muyenga', 'Kololo', 'Nakasero', 'Naalya', 'Kyanja',
+        'Kisaasi', 'Bukoto', 'Kabalagala', 'Namuwongo',
+      ],
+      isDefault: false,
+      standardFeeUgx: 0,
+      expressFeeUgx: 8000,
+      sameDayFeeUgx: 12000,
+      sortOrder: 0,
+    },
+    {
+      // Greater Kampala, just outside city-proper — the nearest upcountry
+      // tier, e.g. Entebbe (the airport town) is under an hour away.
+      name: 'Central Uganda (Rest)',
+      towns: [
+        'Wakiso', 'Entebbe', 'Mukono', 'Mpigi', 'Luwero', 'Nakaseke', 'Mityana',
+        'Mubende', 'Kayunga', 'Buikwe', 'Nakasongola', 'Lugazi', 'Kajjansi', 'Bombo',
+      ],
+      isDefault: false,
+      standardFeeUgx: 8000,
+      expressFeeUgx: 15000,
+      sameDayFeeUgx: 20000,
+      sortOrder: 1,
+    },
+    {
+      name: 'Eastern Uganda',
+      towns: [
+        'Jinja', 'Iganga', 'Mbale', 'Tororo', 'Busia', 'Soroti', 'Kamuli', 'Bugiri',
+        'Pallisa', 'Kumi', 'Budaka', 'Namutumba', 'Buyende',
+      ],
+      isDefault: false,
+      standardFeeUgx: 12000,
+      expressFeeUgx: 20000,
+      sameDayFeeUgx: 28000,
+      sortOrder: 2,
+    },
+    {
+      // Greater Masaka/Ankole/Kigezi — southwest Uganda, distinct from
+      // Western's Toro/Bunyoro towns below (per user decision: Central,
+      // Eastern, Western, Northern, and Southern should each price
+      // differently, not share one "upcountry" rate).
+      name: 'Southern Uganda',
+      towns: [
+        'Masaka', 'Rakai', 'Lyantonde', 'Sembabule', 'Kalangala', 'Kyotera', 'Mbarara',
+        'Ntungamo', 'Isingiro', 'Kiruhura', 'Bushenyi', 'Ibanda', 'Kabale', 'Kisoro',
+        'Rukungiri', 'Kanungu',
+      ],
+      isDefault: false,
+      standardFeeUgx: 15000,
+      expressFeeUgx: 24000,
+      sameDayFeeUgx: 32000,
+      sortOrder: 3,
+    },
+    {
+      name: 'Western Uganda',
+      towns: [
+        'Fort Portal', 'Kasese', 'Hoima', 'Masindi', 'Kibaale', 'Kagadi',
+        'Bundibugyo', 'Kyenjojo', 'Kyegegwa',
+      ],
+      isDefault: false,
+      standardFeeUgx: 16000,
+      expressFeeUgx: 26000,
+      sameDayFeeUgx: 34000,
+      sortOrder: 4,
+    },
+    {
+      name: 'Northern Uganda',
+      towns: [
+        'Gulu', 'Lira', 'Arua', 'Kitgum', 'Moyo', 'Adjumani', 'Nebbi', 'Pader',
+        'Apac', 'Kotido', 'Moroto', 'Nwoya', 'Amuru',
+      ],
+      isDefault: false,
+      standardFeeUgx: 20000,
+      expressFeeUgx: 30000,
+      sameDayFeeUgx: null,
+      sortOrder: 5,
+    },
+    {
+      name: 'Rest of Uganda',
+      towns: [],
+      isDefault: true,
+      standardFeeUgx: 15000,
+      expressFeeUgx: 25000,
+      sameDayFeeUgx: 35000,
+      sortOrder: 99,
+    },
+  ];
+  for (const zone of shippingZones) {
+    const existing = await prisma.shippingZone.findFirst({ where: { name: zone.name } });
+    if (!existing) await prisma.shippingZone.create({ data: zone });
   }
 
   // Wellness Kit bundle — from the Marketing wireframe's Bundle Builder panel
