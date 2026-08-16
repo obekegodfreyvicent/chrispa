@@ -50,6 +50,7 @@ unless they're compound/notable.
 | suspendedAt | DateTime | Yes | — | Admin-triggered, reversible hold — see `CrmService.suspend()`. Blocks login at `completeLogin()` |
 | suspensionReason | String | Yes | — | Free text, shown in the admin audit log |
 | deletedAt | DateTime | Yes | — | Terminal — FR-17.4. Row survives, PII scrubbed |
+| driverStatus | DriverStatus | No | OFFLINE | Added commit `445a258` — only meaningful for `role: DRIVER`; self-reported via `PATCH /driver/status`, never derived from the driver's own `Delivery` rows |
 | createdAt | DateTime | No | now() | |
 | updatedAt | DateTime | No | auto | `@updatedAt` |
 
@@ -304,6 +305,7 @@ semantics.
 | orderId | String | No | — | FK → Order, `@unique` — 1:1, no split-shipment support |
 | driverId | String | No | — | FK → User (relation `DriverDeliveries`); the assigned driver, must have `role: DRIVER` |
 | status | DeliveryStatus | No | ASSIGNED | See the `DeliveryStatus` enum below |
+| priority | DeliveryPriority | No | NORMAL | Added commit `445a258` — set at assignment; a driver's own list sorts URGENT-first, ordering hint only, no automated dispatch reads it |
 | pickupLat / pickupLng | Float | Yes | — | Snapshotted from the driver's browser geolocation at the moment `status` becomes `PICKED_UP` |
 | pickedUpAt | DateTime | Yes | — | Set alongside pickupLat/pickupLng |
 | deliveryLat / deliveryLng | Float | Yes | — | Snapshotted at `DELIVERED`, same reasoning as pickup |
@@ -905,6 +907,8 @@ treated as its own domain in `03-database-design.md`'s inventory table.
 | ProductStatus | DRAFT, ACTIVE, ARCHIVED | ARCHIVED replaces hard-delete once order history exists |
 | OrderStatus | PENDING, PROCESSING, SHIPPED, DELIVERED, REFUND_REQUESTED, REFUNDED, CANCELLED | Governed by an explicit transition state machine |
 | DeliveryStatus | ASSIGNED, EN_ROUTE_TO_PICKUP, PICKED_UP, EN_ROUTE_TO_CUSTOMER, DELIVERED, FAILED | Driver App (commit `75b7cff`, not in original SRS) — `PICKED_UP`/`DELIVERED` mirror onto `Order.status` (SHIPPED/DELIVERED respectively); `FAILED` reachable from any in-progress state, terminal like `DELIVERED` |
+| DriverStatus | OFFLINE, AVAILABLE, ON_DELIVERY | Added commit `445a258` — self-reported driver availability, `User.driverStatus` |
+| DeliveryPriority | NORMAL, URGENT | Added commit `445a258` — set at assignment, ordering hint for the driver's own list |
 | DeliveryMethod | STANDARD, EXPRESS, SAME_DAY | |
 | CouponType | PERCENT_OFF, FIXED_OFF, FREE_SHIPPING | |
 | TicketStatus | OPEN, IN_PROGRESS, RESOLVED, CLOSED | |

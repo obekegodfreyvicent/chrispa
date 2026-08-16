@@ -280,6 +280,23 @@ section postdates the rest of the document.
 - Both the customer's and staff's printable receipt (see Checkout & Order Processing above) read `Delivery`
   via `Order.delivery` to show driver name, pickup time+location, and delivery time+location.
 
+**Added commit `445a258`** (delivery-services MVP gaps, scoped against the customer's own stated MVP list —
+see [`16-user-and-administrator-procedures.md`](./16-user-and-administrator-procedures.md) for what was
+deliberately left out and why):
+- **Driver availability** (`PATCH`/`GET /driver/status`): a plain `User.driverStatus` write, self-reported
+  only — not wired into the assignment or status-update flows above, deliberately (see the schema comment on
+  why it's never derived from a driver's own `Delivery` rows).
+- **Priority** (`assign-driver`'s optional `priority` field): stored on `Delivery`, read back only by
+  `listMine()`'s sort order (`priority desc, assignedAt asc`) — no other process consumes it; there is no
+  automated-dispatch flow that reads it.
+- **Customer notifications**: `notifyCustomer()` runs after each of the flows above that changes `status` to
+  `ASSIGNED`, `PICKED_UP`, `DELIVERED`, or `FAILED` — reads `Order.user`'s `notifyOrderUpdatesEmail`/
+  `notifyOrderUpdatesSms` preferences, then calls `MailService`/`SmsService` (the same already-live Brevo/
+  Africa's Talking integrations registration OTP uses). Best-effort — wrapped so a send failure is logged and
+  swallowed, never blocking the delivery-status write it's attached to.
+- **Admin Dashboard summary** (`GET /admin/deliveries/summary`, not diagrammed — a simple `groupBy` read, no
+  new data flow of its own): feeds the Dashboard's new "Active Deliveries" panel.
+
 ## Level 1 — Inventory (read side)
 
 ```

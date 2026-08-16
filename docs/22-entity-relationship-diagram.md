@@ -136,7 +136,10 @@ actually read.
   in original SRS) — assigning a driver to an order that already has one `upsert`s the existing row rather
   than creating a second, clearing its pickup/delivery snapshots and resetting `status` to `ASSIGNED`; there
   is no history of prior driver assignments once reassigned. `currentLat`/`currentLng`/`lastLocationAt` are
-  likewise a single overwritten snapshot, not a location-history table.
+  likewise a single overwritten snapshot, not a location-history table. `priority` (commit `445a258`) is
+  preserved across reassignment (not reset like the pickup/delivery fields) unless the reassign call passes a
+  new one. `User.driverStatus` (also commit `445a258`) is a plain scalar on `User`, not a relation — see the
+  Data Dictionary for its self-reported-only semantics.
 - **`Bundle.productIds`** is a scalar `String[]` of Product IDs, not a join table — no referential integrity
   (a deleted/archived product ID can linger in a bundle's array unnoticed); a deliberate simplification, not
   an oversight, per the schema's own comment.

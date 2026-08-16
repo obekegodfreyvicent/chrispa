@@ -114,26 +114,35 @@ ever reconsidered.
 **Admin side**:
 1. Create a driver account via the normal staff-login flow above (`loginRole: 'DRIVER'`).
 2. Open the order in Admin → Orders → an order, and use the **Delivery / Driver** card to assign (or
-   reassign) a driver from the dropdown. Reassigning an in-progress delivery restarts its own status
-   lifecycle (back to `ASSIGNED`) — it does **not** move `Order.status` backward.
+   reassign) a driver from the dropdown — each driver's current availability shows inline (`available` /
+   `on delivery` / `offline`, added commit `445a258`). Pick a **priority** (Normal/Urgent) alongside the
+   driver; a driver's own list surfaces Urgent deliveries first. Reassigning an in-progress delivery restarts
+   its own status lifecycle (back to `ASSIGNED`) — it does **not** move `Order.status` backward.
 3. Watch the same card for live status, pickup/delivery timestamps, and Google Maps links as the driver
    works the delivery — no separate "track a driver" page, it's on the order itself.
 4. Both the admin and customer printable receipts (View / Print Receipt) show the driver's name, pickup
    time+location, and delivery time+location once set — this was the actual point of the request ("all
    information in a driver app should appear in receipt for both customer and admin").
+5. Admin → Dashboard shows an **Active Deliveries** panel (counts by status, added commit `445a258`) —
+   compute-on-read, same "no stored metric" approach as every other dashboard figure in this codebase.
 
 **Driver side** (Admin → My Deliveries, only visible/usable by `DRIVER`-role accounts):
-1. See assigned deliveries, grouped Active / Completed.
-2. Open one to see the pickup location (warehouse) and delivery destination (customer address), each with a
+1. Toggle **availability** (Available / Offline) at the top of the page — self-reported only, never inferred
+   from their current deliveries (going offline mid-delivery doesn't touch the delivery itself, it just tells
+   admins not to hand them anything new). Switches to "On a delivery" automatically only in the sense that the
+   toggle is hidden while one is in progress — it's still the driver's own signal, not derived.
+2. See assigned deliveries, grouped Active / Completed, Urgent ones flagged and sorted first.
+3. Open one to see the pickup location (warehouse) and delivery destination (customer address), each with a
    "Open in Google Maps" link for actual turn-by-turn directions.
-3. Advance through the lifecycle with one button at a time: *heading to pickup → picked up → heading to
+4. Advance through the lifecycle with one button at a time: *heading to pickup → picked up → heading to
    customer → delivered*. The **picked up** and **delivered** steps require sharing the browser's current
    location (`navigator.geolocation`) — the button is blocked with a clear error if location access is
    denied, since those two moments are exactly what gets snapshotted onto the receipt.
-4. A "Share my current location" button is available while en route, for a manual live-position update — not
+5. A "Share my current location" button is available while en route, for a manual live-position update — not
    automatic/continuous tracking (no background-location permission is requested; that would need a native
-   app, not a browser tab).
-5. "Report a problem / mark as failed" is available from any in-progress state, for a delivery attempt that
+   app, not a browser tab). The customer's own order-tracking page (storefront) shows this same last-known
+   position while a delivery is en route.
+6. "Report a problem / mark as failed" is available from any in-progress state, for a delivery attempt that
    couldn't be completed (customer unreachable, refused, etc.) — terminal, same as `DELIVERED`, no further
    transitions.
 
@@ -142,6 +151,33 @@ through `PROCESSING` first if staff hadn't already moved it there — a driver b
 leaves `PENDING` is normal, not an error). This reuses the exact same `OrdersService.updateStatus()` staff
 already use from the Orders page, so revenue recognition and the rest of the order pipeline behave
 identically regardless of whether a driver or a staff member triggered the transition.
+
+**Customer notifications** (added commit `445a258`): the customer gets a real email/SMS (via the already-live
+Brevo/Africa's Talking services) when a driver is assigned, when the order is picked up, when it's delivered,
+and if a delivery attempt fails — respecting that customer's own `notifyOrderUpdatesEmail`/
+`notifyOrderUpdatesSms` preferences (Account → Settings). This is best-effort: a notification failure never
+blocks the delivery status change itself, logged and moved past, same pattern as every other notification
+send in this codebase.
+
+**Deliberately not built** (a full delivery-services platform has many more features than this — these
+specific ones were scoped out because each needs either a paid third-party integration or a business-policy
+decision that isn't a code choice):
+- **Route optimization / multi-stop planning / traffic-aware routing** — needs a routing API (Google
+  Directions, Mapbox, etc.) with its own billing account, same class of decision as the Google-Maps-deep-link
+  choice already made for basic navigation.
+- **Live in-app map with a rendered route** — needs a maps SDK (Google Maps/Mapbox JS) with its own billing;
+  deliberately replaced with deep-linking to Google Maps instead (per user decision, see the Driver App intro
+  above).
+- **Automatic/algorithmic driver dispatch** — assignment is manual only; automating it needs a defined policy
+  (nearest available driver? round-robin? load-balanced?) that's a dispatch-strategy decision, not something
+  to invent silently.
+- **Driver earnings, commission, and payout automation** — ChrisPa already has a real, carefully-built payroll
+  system (Uganda PAYE/NSSF, see [`03-database-design.md`](./03-database-design.md)'s HR — payroll section)
+  with an explicit "accountant sign-off before touching rates" rule; a driver commission model is a real
+  financial/compliance decision, not something to bolt on without that same rigor.
+- **Surge/dynamic delivery pricing, QR/barcode scanning, fraud detection, geofencing/delivery-zone
+  management, multi-currency support** — none of these have a defined policy or requirement yet; flagged here
+  so a future request to add one of them starts from an explicit decision, not a silent assumption.
 
 ## Customer receipts require the customer's own confirmation first
 

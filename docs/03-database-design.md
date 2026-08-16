@@ -94,7 +94,7 @@ assigns a driver and how a driver works a delivery.
 | Catalog | `ProductLine`, `WellnessTag`, `Product` (now with optional `vendorId`/`costUgx`), `ProductWellnessTag`, `ProductMedia`, `Variant` |
 | Inventory | `Warehouse`, `InventoryRecord` |
 | Cart & checkout | `Cart`, `CartItem`, `Order` (now with `vatUgx`, `deliveryConfirmedAt`), `OrderItem` (now with `vendorId`/`costUgxSnapshot`/`platformCommissionUgx`/`vendorPayoutUgx`/`vendorPayoutId`) |
-| Delivery (Driver App) | `Delivery` — 1:1 with `Order`, driver assignment + GPS pickup/delivery tracking, not in the original SRS (per user request, see [`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md) for the new `DRIVER` role and [`16-user-and-administrator-procedures.md`](./16-user-and-administrator-procedures.md) for how it's used) |
+| Delivery (Driver App) | `Delivery` — 1:1 with `Order`, driver assignment + GPS pickup/delivery tracking + `priority` (commit `445a258`), not in the original SRS (per user request, see [`07-authentication-and-authorization.md`](./07-authentication-and-authorization.md) for the new `DRIVER` role and [`16-user-and-administrator-procedures.md`](./16-user-and-administrator-procedures.md) for how it's used). `User.driverStatus` (self-reported availability, commit `445a258`) lives on `User` itself, not this table |
 | Marketplace | `Vendor`, `VendorPayout` — see below |
 | Payments | `PaymentTransaction` — see below |
 | Marketing | `Coupon`, `Bundle`, `NewsletterSubscriber` (FR-26.4 — footer email capture, not tied to `User`), `NewsletterCampaign` (one row per admin "Compose Newsletter" send) |
