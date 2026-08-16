@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DeliveryPriority, DeliveryStatus, DriverStatus, OrderStatus, Prisma, UserRole } from '@prisma/client';
 import { ActivityLogService, ActorInfo, deriveActorType, RequestInfo } from '../../common/activity-log/activity-log.service';
+import { GeocodingService } from '../../common/geocoding/geocoding.service';
 import { MailService } from '../../common/notifications/mail.service';
 import { SmsService } from '../../common/notifications/sms.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -57,6 +58,7 @@ export class DeliveryService {
     private readonly orders: OrdersService,
     private readonly mail: MailService,
     private readonly sms: SmsService,
+    private readonly geocoding: GeocodingService,
   ) {}
 
   // ---------- Admin ----------
@@ -106,9 +108,11 @@ export class DeliveryService {
         ...(priority ? { priority } : {}),
         pickupLat: null,
         pickupLng: null,
+        pickupLocationName: null,
         pickedUpAt: null,
         deliveryLat: null,
         deliveryLng: null,
+        deliveryLocationName: null,
         deliveredAt: null,
         currentLat: null,
         currentLng: null,
@@ -257,14 +261,25 @@ export class DeliveryService {
       throw new BadRequestException('GPS coordinates are required to confirm pickup or delivery.');
     }
 
+    // Best-effort, same "never block on a third-party call" reasoning as
+    // notifyCustomer() below — a slow/failed reverse-geocode still lets
+    // pickup/delivery confirmation go through with no place name rather than
+    // failing the whole status update.
+    const locationName =
+      status === DeliveryStatus.PICKED_UP || status === DeliveryStatus.DELIVERED
+        ? await this.geocoding.reverseGeocode(lat!, lng!)
+        : null;
+
     const data: Prisma.DeliveryUpdateInput = { status };
     if (status === DeliveryStatus.PICKED_UP) {
       data.pickedUpAt = new Date();
       data.pickupLat = lat;
       data.pickupLng = lng;
+      data.pickupLocationName = locationName;
     }
     if (status === DeliveryStatus.DELIVERED) {
       data.deliveredAt = new Date();
+      data.deliveryLocationName = locationName;
       data.deliveryLat = lat;
       data.deliveryLng = lng;
     }

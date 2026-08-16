@@ -30,9 +30,11 @@ interface InvoiceOrder {
     pickedUpAt: string | null;
     pickupLat: number | null;
     pickupLng: number | null;
+    pickupLocationName: string | null;
     deliveredAt: string | null;
     deliveryLat: number | null;
     deliveryLng: number | null;
+    deliveryLocationName: string | null;
   } | null;
 }
 
@@ -201,7 +203,10 @@ export default function AdminInvoicePage(props: PageProps<'/orders/[id]/invoice'
               <div className="text-gray-500">
                 Picked up: {fmtDateTime(order.delivery.pickedUpAt)}
                 {order.delivery.pickupLat && order.delivery.pickupLng && (
-                  <> — <a href={mapsUrl(order.delivery.pickupLat, order.delivery.pickupLng)} target="_blank" rel="noreferrer" className="underline">GPS location</a></>
+                  <>
+                    {' '}— <a href={mapsUrl(order.delivery.pickupLat, order.delivery.pickupLng)} target="_blank" rel="noreferrer" className="underline">GPS location</a>
+                    {order.delivery.pickupLocationName && ` (${order.delivery.pickupLocationName})`}
+                  </>
                 )}
               </div>
             )}
@@ -209,7 +214,10 @@ export default function AdminInvoicePage(props: PageProps<'/orders/[id]/invoice'
               <div className="text-gray-500">
                 Delivered: {fmtDateTime(order.delivery.deliveredAt)}
                 {order.delivery.deliveryLat && order.delivery.deliveryLng && (
-                  <> — <a href={mapsUrl(order.delivery.deliveryLat, order.delivery.deliveryLng)} target="_blank" rel="noreferrer" className="underline">GPS location</a></>
+                  <>
+                    {' '}— <a href={mapsUrl(order.delivery.deliveryLat, order.delivery.deliveryLng)} target="_blank" rel="noreferrer" className="underline">GPS location</a>
+                    {order.delivery.deliveryLocationName && ` (${order.delivery.deliveryLocationName})`}
+                  </>
                 )}
               </div>
             )}

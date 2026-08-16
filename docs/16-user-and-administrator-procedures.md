@@ -123,7 +123,16 @@ ever reconsidered.
    works the delivery — no separate "track a driver" page, it's on the order itself.
 4. Both the admin and customer printable receipts (View / Print Receipt) show the driver's name, pickup
    time+location, and delivery time+location once set — this was the actual point of the request ("all
-   information in a driver app should appear in receipt for both customer and admin").
+   information in a driver app should appear in receipt for both customer and admin"). Each "GPS location"
+   link is followed by the actual place name in parentheses (e.g. "GPS location (Nakasero, Kampala Capital
+   City)") — added per user request, since raw coordinates and a map link alone didn't say *where* that was
+   at a glance. The name is resolved once, at the moment `PICKED_UP`/`DELIVERED` is confirmed
+   (`GeocodingService`, OpenStreetMap's free Nominatim reverse-geocoding API — not Google's paid Geocoding
+   API, same reasoning as deep-linking to Google Maps instead of embedding its SDK, see the "Deliberately not
+   built" list below), and snapshotted onto the `Delivery` row alongside the coordinates — it never changes
+   later even if a fresh lookup for those same coordinates would answer differently. Best-effort: if the
+   lookup fails or times out, the receipt still shows the GPS map link, just without a name in parentheses —
+   it never blocks the driver's pickup/delivery confirmation itself.
 5. Admin → Dashboard shows an **Active Deliveries** panel (counts by status, added commit `445a258`) —
    compute-on-read, same "no stored metric" approach as every other dashboard figure in this codebase.
 

@@ -307,8 +307,10 @@ semantics.
 | status | DeliveryStatus | No | ASSIGNED | See the `DeliveryStatus` enum below |
 | priority | DeliveryPriority | No | NORMAL | Added commit `445a258` — set at assignment; a driver's own list sorts URGENT-first, ordering hint only, no automated dispatch reads it |
 | pickupLat / pickupLng | Float | Yes | — | Snapshotted from the driver's browser geolocation at the moment `status` becomes `PICKED_UP` |
+| pickupLocationName | String | Yes | — | Added this session — best-effort reverse-geocoded label for pickupLat/pickupLng (`GeocodingService`, OpenStreetMap Nominatim), resolved once at `PICKED_UP` and snapshotted alongside the coordinates, never re-resolved later; null if the lookup failed (never blocks the status update) |
 | pickedUpAt | DateTime | Yes | — | Set alongside pickupLat/pickupLng |
 | deliveryLat / deliveryLng | Float | Yes | — | Snapshotted at `DELIVERED`, same reasoning as pickup |
+| deliveryLocationName | String | Yes | — | Added this session — same reverse-geocoding as pickupLocationName, resolved at `DELIVERED` |
 | deliveredAt | DateTime | Yes | — | Set alongside deliveryLat/deliveryLng |
 | currentLat / currentLng | Float | Yes | — | Last-known position while en route — a single overwritten snapshot, not a location-history table |
 | lastLocationAt | DateTime | Yes | — | Timestamp of the last position update |

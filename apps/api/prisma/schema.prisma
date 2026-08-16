@@ -599,15 +599,24 @@ model Delivery {
   // Snapshotted at PICKED_UP time from the driver's browser geolocation —
   // deliberately not just copied from Warehouse's own address, since the
   // driver's actual GPS position at pickup is the more useful/honest record
-  // for the receipt (confirms they were really there).
-  pickupLat  Float?
-  pickupLng  Float?
-  pickedUpAt DateTime? @db.Timestamptz(3)
+  // for the receipt (confirms they were really there). pickupLocationName is
+  // a best-effort reverse-geocoded label (GeocodingService, OpenStreetMap
+  // Nominatim) resolved once at the same moment and snapshotted alongside
+  // the coordinates — never re-resolved later, so the receipt always shows
+  // exactly what was true at pickup even if the geocoding service's answer
+  // for those coordinates would differ today. Null if the lookup failed
+  // (never blocks the status update itself) — the receipt just shows the
+  // GPS map link with no name in that case.
+  pickupLat          Float?
+  pickupLng          Float?
+  pickupLocationName String?
+  pickedUpAt         DateTime? @db.Timestamptz(3)
 
   // Snapshotted at DELIVERED time, same reasoning as pickup above.
-  deliveryLat  Float?
-  deliveryLng  Float?
-  deliveredAt  DateTime? @db.Timestamptz(3)
+  deliveryLat          Float?
+  deliveryLng          Float?
+  deliveryLocationName String?
+  deliveredAt          DateTime? @db.Timestamptz(3)
 
   // Last-known position while EN_ROUTE_* — see class comment on why this
   // isn't a history table.
