@@ -102,6 +102,7 @@ just hasn't been wired to them. Until that exists, a forgotten staff password mu
 | Review/respond to a support ticket, change its status | Admin → Support Tickets | `OWNER`, `STORE_MANAGER`, `SUPPORT_AGENT` |
 | Assign/reassign a driver to an order | Admin → Orders → an order → Delivery / Driver | `OWNER`, `STORE_MANAGER`, `FULFILLMENT` |
 | Work an assigned delivery (pickup/delivery, GPS) | Admin → My Deliveries | `DRIVER` (own assigned deliveries only) |
+| View every driver's deliveries (read-only oversight) | Admin → Deliveries | `OWNER`, `STORE_MANAGER`, `FULFILLMENT` |
 
 ## Assigning and tracking deliveries (Driver App)
 
@@ -145,6 +146,17 @@ ever reconsidered.
 6. "Report a problem / mark as failed" is available from any in-progress state, for a delivery attempt that
    couldn't be completed (customer unreachable, refused, etc.) — terminal, same as `DELIVERED`, no further
    transitions.
+
+**Owner/Store Manager/Fulfillment oversight view** (same page, Admin → Deliveries — added per user request
+after `OWNER` first hit this page's driver-only 403): `OWNER`, `STORE_MANAGER`, and `FULFILLMENT` also have
+access to `/my-deliveries`, but read-only and across every driver, not scoped to a `driverId` the way the
+driver's own view is — they aren't drivers themselves, so "my deliveries" would otherwise always be empty for
+them (`MyDeliveriesController`/`DeliveryService.listMine()`/`getMine()` branch on the caller's role: a
+`DRIVER` still only ever sees their own, everyone else in that role list sees all of them, each card labeled
+with the assigned driver's name). The availability toggle and the "heading to pickup" / "picked up" /
+"delivered" / "mark as failed" action buttons — anything that's actually the driver doing the delivery — are
+hidden in this mode; those calls stay `DRIVER`-only server-side regardless of what the UI shows. To actually
+work a delivery (advance its status, share GPS), sign in as that driver's own account.
 
 Marking **picked up** auto-advances `Order.status` to `SHIPPED` and **delivered** to `DELIVERED` (stepping
 through `PROCESSING` first if staff hadn't already moved it there — a driver being assigned before an order

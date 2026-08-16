@@ -55,6 +55,9 @@ const FINANCE_NAV = [
 // Driver App (per user request, not in the original SRS) — DRIVER-role
 // self-service, same shape as My HR: a driver only ever sees their own
 // assigned deliveries (enforced server-side, see MyDeliveriesController).
+// Also opened up (same page, oversight mode) to OWNER/STORE_MANAGER/
+// FULFILLMENT — per user decision, since they don't have deliveries of
+// their own and previously just hit a 403 on this link.
 const MY_DELIVERIES_NAV = [
   { href: '/my-deliveries', icon: '▶', label: 'My Deliveries' },
 ];
@@ -66,7 +69,7 @@ const SECTIONS = [
   { key: 'hr', title: 'Human Resources', items: HR_NAV },
   { key: 'my-hr', title: 'My HR', items: MY_HR_NAV },
   { key: 'finance', title: 'Financial & Accounting', items: FINANCE_NAV },
-  { key: 'my-deliveries', title: 'Driver', items: MY_DELIVERIES_NAV },
+  { key: 'my-deliveries', title: 'Deliveries', items: MY_DELIVERIES_NAV },
 ];
 
 function sectionHasActiveItem(items: { href: string }[], pathname: string | null) {
@@ -76,8 +79,10 @@ function sectionHasActiveItem(items: { href: string }[], pathname: string | null
 // Access policy: Owner sees everything. HR Manager sees Human Resources +
 // My HR only — no Admin/Backend, no Financial & Accounting. Store Manager
 // and Fulfillment both see Admin/Backend (minus Users & Settings and
-// Activity Log, which stay Owner-only) + My HR — no Human Resources
-// oversight, no Financial & Accounting; the difference between them (Store
+// Activity Log, which stay Owner-only) + My HR + Deliveries (read-only
+// oversight of every driver's deliveries, not their own — they aren't
+// drivers; see MyDeliveriesController) — no Human Resources oversight, no
+// Financial & Accounting; the difference between them (Store
 // Manager has full read/write, Fulfillment is read-only except
 // order-status transitions) is enforced server-side (RolesGuard), not by
 // which tabs show here. Support Tickets is further restricted within that
@@ -100,7 +105,7 @@ function visibleSections(role: UserRole | null) {
   }
   if (role === 'HR_MANAGER') return SECTIONS.filter((s) => s.key !== 'admin' && s.key !== 'finance' && s.key !== 'my-deliveries');
   if (role === 'STORE_MANAGER' || role === 'FULFILLMENT') {
-    return SECTIONS.filter((s) => s.key !== 'hr' && s.key !== 'finance' && s.key !== 'my-deliveries').map((s) =>
+    return SECTIONS.filter((s) => s.key !== 'hr' && s.key !== 'finance').map((s) =>
       s.key === 'admin'
         ? {
             ...s,

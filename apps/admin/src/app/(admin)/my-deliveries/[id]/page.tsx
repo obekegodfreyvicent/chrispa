@@ -2,8 +2,12 @@
 
 import Link from 'next/link';
 import { use, useEffect, useState } from 'react';
-import { authedFetch, getAccessToken } from '@/lib/auth-client';
+import { authedFetch, getAccessToken, getUserRole } from '@/lib/auth-client';
 import { Card, Status, ButtonGold, ButtonOutline, ButtonDanger } from '@/components/ui';
+
+// OWNER/STORE_MANAGER/FULFILLMENT get a read-only oversight view — see
+// MyDeliveriesController and the list page's matching constant.
+const OVERSIGHT_ROLES = ['OWNER', 'STORE_MANAGER', 'FULFILLMENT'];
 
 interface OrderItem {
   id: string;
@@ -22,6 +26,7 @@ interface Delivery {
   deliveredAt: string | null;
   currentLat: number | null;
   currentLng: number | null;
+  driver: { name: string; phone: string | null } | null;
   order: {
     orderNumber: string;
     totalUgx: number;
@@ -202,18 +207,27 @@ export default function MyDeliveryDetailPage(props: PageProps<'/my-deliveries/[i
   if (!delivery) return <div className="text-sm text-text-2">Loading…</div>;
 
   const { order } = delivery;
-  const next = NEXT_STEP[delivery.status];
+  const isOversight = OVERSIGHT_ROLES.includes(getUserRole() ?? '');
+  const next = !isOversight && NEXT_STEP[delivery.status];
   const destinationAddress = `${order.shippingAddress?.line1 ?? ''}, ${order.shippingAddress?.city ?? ''}`;
 
   return (
     <div className="max-w-lg">
-      <Link href="/my-deliveries" className="text-[11px] text-gold-light">← My Deliveries</Link>
+      <Link href="/my-deliveries" className="text-[11px] text-gold-light">← {isOversight ? 'Deliveries' : 'My Deliveries'}</Link>
       <div className="flex justify-between items-center mt-1 mb-4">
         <h1 className="font-serif text-xl">Order #{order.orderNumber}</h1>
         <Status variant={delivery.status === 'DELIVERED' ? 'ok' : delivery.status === 'FAILED' ? 'danger' : 'pending'}>
           {delivery.status.replace(/_/g, ' ')}
         </Status>
       </div>
+
+      {isOversight && (
+        <Card className="mb-4">
+          <div className="text-[10px] uppercase text-text-2 mb-2">Driver</div>
+          <div className="text-sm">{delivery.driver?.name ?? '—'}</div>
+          {delivery.driver?.phone && <div className="text-xs text-text-2">{delivery.driver.phone}</div>}
+        </Card>
+      )}
 
       <Card className="mb-4">
         <div className="text-[10px] uppercase text-text-2 mb-2">Pickup</div>
@@ -277,7 +291,7 @@ export default function MyDeliveryDetailPage(props: PageProps<'/my-deliveries/[i
           {pending ? 'Updating…' : next.label}
         </ButtonGold>
       )}
-      {(delivery.status === 'EN_ROUTE_TO_PICKUP' || delivery.status === 'EN_ROUTE_TO_CUSTOMER') && (
+      {!isOversight && (delivery.status === 'EN_ROUTE_TO_PICKUP' || delivery.status === 'EN_ROUTE_TO_CUSTOMER') && (
         <ButtonOutline className="w-full mb-2.5" disabled={sharingLocation} onClick={shareLocation}>
           {sharingLocation ? 'Sharing…' : 'Share my current location'}
         </ButtonOutline>

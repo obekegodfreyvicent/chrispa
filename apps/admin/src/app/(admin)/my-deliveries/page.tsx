@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { authedFetch, getAccessToken } from '@/lib/auth-client';
+import { authedFetch, getAccessToken, getUserRole } from '@/lib/auth-client';
 import { useRefetchOnFocus } from '@/lib/use-refetch-on-focus';
 import { Card, Chip, Status, ButtonGhost, ButtonGold, ButtonOutline } from '@/components/ui';
 
@@ -11,12 +11,18 @@ interface Delivery {
   status: string;
   priority: string;
   assignedAt: string;
+  driver: { name: string } | null;
   order: {
     orderNumber: string;
     totalUgx: number;
     shippingAddress: { recipient?: string; line1?: string; city?: string };
   };
 }
+
+// OWNER/STORE_MANAGER/FULFILLMENT get a read-only oversight view of every
+// driver's deliveries on this same page instead of the driver's own
+// self-service one (per user decision — see MyDeliveriesController).
+const OVERSIGHT_ROLES = ['OWNER', 'STORE_MANAGER', 'FULFILLMENT'];
 
 const DRIVER_STATUS_LABEL: Record<string, string> = {
   OFFLINE: 'Offline',
@@ -44,6 +50,7 @@ export default function MyDeliveriesPage() {
   const [authed, setAuthed] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
+  const isOversight = OVERSIGHT_ROLES.includes(getUserRole() ?? '');
 
   function load() {
     if (!getAccessToken()) {
@@ -61,6 +68,7 @@ export default function MyDeliveriesPage() {
     }).then((data) => {
       if (data) setDeliveries(data);
     });
+    if (isOversight) return;
     authedFetch('/driver/status')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => setDriverStatus(data?.driverStatus ?? null));
@@ -114,25 +122,33 @@ export default function MyDeliveriesPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-3.5">
-        <h1 className="font-serif text-xl">My Deliveries</h1>
+        <h1 className="font-serif text-xl">{isOversight ? 'Deliveries' : 'My Deliveries'}</h1>
         <ButtonGhost onClick={load}>Refresh</ButtonGhost>
       </div>
 
-      <Card className="mb-4 flex justify-between items-center">
-        <div>
-          <div className="text-[10px] uppercase text-text-2 mb-1">Availability</div>
-          <Status variant={driverStatus === 'AVAILABLE' ? 'ok' : driverStatus === 'ON_DELIVERY' ? 'pending' : 'danger'}>
-            {driverStatus ? DRIVER_STATUS_LABEL[driverStatus] ?? driverStatus : '—'}
-          </Status>
-        </div>
-        {driverStatus !== 'ON_DELIVERY' && (
-          driverStatus === 'AVAILABLE' ? (
-            <ButtonOutline disabled={togglingStatus} onClick={toggleStatus}>Go offline</ButtonOutline>
-          ) : (
-            <ButtonGold disabled={togglingStatus} onClick={toggleStatus}>Go available</ButtonGold>
-          )
-        )}
-      </Card>
+      {isOversight && (
+        <p className="text-xs text-text-2 mb-3.5">
+          Read-only oversight view across every driver — deliveries are advanced from the driver&apos;s own account.
+        </p>
+      )}
+
+      {!isOversight && (
+        <Card className="mb-4 flex justify-between items-center">
+          <div>
+            <div className="text-[10px] uppercase text-text-2 mb-1">Availability</div>
+            <Status variant={driverStatus === 'AVAILABLE' ? 'ok' : driverStatus === 'ON_DELIVERY' ? 'pending' : 'danger'}>
+              {driverStatus ? DRIVER_STATUS_LABEL[driverStatus] ?? driverStatus : '—'}
+            </Status>
+          </div>
+          {driverStatus !== 'ON_DELIVERY' && (
+            driverStatus === 'AVAILABLE' ? (
+              <ButtonOutline disabled={togglingStatus} onClick={toggleStatus}>Go offline</ButtonOutline>
+            ) : (
+              <ButtonGold disabled={togglingStatus} onClick={toggleStatus}>Go available</ButtonGold>
+            )
+          )}
+        </Card>
+      )}
 
       <div className="text-[10px] uppercase text-text-2 mb-2">Active</div>
       {active.length === 0 ? (
@@ -151,6 +167,7 @@ export default function MyDeliveriesPage() {
                     <div className="text-xs text-text-2 mt-0.5">
                       {d.order.shippingAddress?.recipient} — {d.order.shippingAddress?.line1}, {d.order.shippingAddress?.city}
                     </div>
+                    {isOversight && <div className="text-[11px] text-gold-light mt-0.5">Driver: {d.driver?.name ?? '—'}</div>}
                   </div>
                   <Status variant={STATUS_VARIANT[d.status] ?? 'pending'}>{d.status.replace(/_/g, ' ')}</Status>
                 </div>
@@ -168,7 +185,10 @@ export default function MyDeliveriesPage() {
               <Link key={d.id} href={`/my-deliveries/${d.id}`}>
                 <Card>
                   <div className="flex justify-between items-center">
-                    <div className="text-sm">#{d.order.orderNumber}</div>
+                    <div className="text-sm">
+                      #{d.order.orderNumber}
+                      {isOversight && <span className="text-text-2 font-normal"> — {d.driver?.name ?? '—'}</span>}
+                    </div>
                     <Chip gold={d.status === 'DELIVERED'}>{d.status.replace(/_/g, ' ')}</Chip>
                   </div>
                 </Card>

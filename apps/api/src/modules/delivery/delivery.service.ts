@@ -161,17 +161,26 @@ export class DeliveryService {
   // URGENT-first, then oldest-assigned-first within each priority — a
   // simple, transparent dispatch-priority ordering rather than automated
   // assignment (which stays manual, per user decision — see
-  // docs/17-infrastructure-platform-roadmap.md).
-  listMine(driverId: string) {
+  // docs/17-infrastructure-platform-roadmap.md). OWNER/STORE_MANAGER/
+  // FULFILLMENT hit this same endpoint for a read-only oversight view of
+  // every driver's deliveries (per user decision — they don't have
+  // deliveries of their own, so "mine" would otherwise always be empty for
+  // them); a DRIVER still only ever sees their own.
+  listMine(callerId: string, callerRole: UserRole) {
     return this.prisma.delivery.findMany({
-      where: { driverId },
+      where: callerRole === UserRole.DRIVER ? { driverId: callerId } : {},
       include: DELIVERY_INCLUDE,
       orderBy: [{ priority: 'desc' }, { assignedAt: 'asc' }],
     });
   }
 
-  getMine(driverId: string, id: string) {
-    return this.getOwnDelivery(driverId, id);
+  async getMine(callerId: string, callerRole: UserRole, id: string) {
+    if (callerRole !== UserRole.DRIVER) {
+      const delivery = await this.prisma.delivery.findUnique({ where: { id }, include: DELIVERY_INCLUDE });
+      if (!delivery) throw new NotFoundException('Delivery not found');
+      return delivery;
+    }
+    return this.getOwnDelivery(callerId, id);
   }
 
   // Steps Order.status forward through PROCESSING/SHIPPED/DELIVERED as
