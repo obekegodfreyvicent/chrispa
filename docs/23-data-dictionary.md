@@ -5,7 +5,7 @@ same domain sections as [`03-database-design.md`](./03-database-design.md)'s sch
 [`22-entity-relationship-diagram.md`](./22-entity-relationship-diagram.md) for how these models relate to
 each other.
 
-**Freshness note**: generated against commit `7e197b9` (2026-08-17) — a point-in-time artifact, not
+**Freshness note**: generated against commit `c917b38` (2026-08-17) — a point-in-time artifact, not
 auto-synced to the live schema; treat any discrepancy with the current `schema.prisma` as this document
 having drifted, not the code being wrong.
 

@@ -1,6 +1,6 @@
 # 22. Entity Relationship Diagram
 
-**Freshness note**: generated against commit `7e197b9` (2026-08-17), `apps/api/prisma/schema.prisma` as of
+**Freshness note**: generated against commit `c917b38` (2026-08-17), `apps/api/prisma/schema.prisma` as of
 that commit — a point-in-time artifact, not auto-synced; re-generate by hand after schema changes. See
 [`03-database-design.md`](./03-database-design.md) for the narrative overview, and
 [`23-data-dictionary.md`](./23-data-dictionary.md) for full field-level detail.

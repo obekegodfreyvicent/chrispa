@@ -183,9 +183,14 @@ delete it (blocked if it's the current Default zone — make another zone Defaul
 - Leave a fee field blank to switch that delivery method off entirely for a zone — it shows "Not offered" on
   the zone card and becomes unselectable for a customer whose city matches that zone at checkout.
 - Exactly one zone must be marked **Default** — the fallback for any city that doesn't match any zone's town
-  list (a typo, an unlisted village, etc.). ChrisPa ships with two zones: **Kampala Metro** and **Rest of
-  Uganda** (the default, priced higher — including Same-day, which per user decision isn't switched off
-  outside Kampala, just priced for the distance).
+  list (a typo, an unlisted village, etc.). ChrisPa ships with seven zones, priced by rough real-world
+  distance from the Kampala warehouse (per explicit user correction: Central, Eastern, Western, Northern, and
+  Southern must each charge different rates, not one shared "upcountry" price): **Kampala Metro** (cheapest),
+  **Central Uganda (Rest)** (Entebbe/Mukono/Wakiso — the nearest upcountry towns), **Eastern**, **Southern**
+  (greater Masaka/Ankole/Kigezi), **Western** (Toro/Bunyoro) — each pricier than the last — and **Northern**
+  (farthest, most expensive, and the one zone with **no Same-day option at all**: Gulu/Lira/Arua/Kitgum are
+  realistically 5-8 hours' drive one way). **Rest of Uganda** is the **default** fallback, priced
+  conservatively for anything matching none of the named zones.
 - Town matching is case-insensitive and forgiving of extra words ("Kampala", "kampala uganda" both match a
   zone listing "Kampala") — it's plain text, not a dropdown of official Uganda administrative divisions, so
   list every spelling/neighborhood variant you want a zone to catch.

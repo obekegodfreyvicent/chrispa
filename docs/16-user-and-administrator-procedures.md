@@ -214,9 +214,19 @@ going. It's now priced by **both** destination and delivery method, editable fro
 2. Exactly one zone must be marked **Default** at all times — it's the fallback whenever a customer's typed
    city doesn't match any zone's town list (a typo, an unlisted village, etc.). You can't delete the current
    default zone or leave zero/multiple zones marked default; the form blocks it with a clear error. ChrisPa
-   ships with two zones seeded: **Kampala Metro** (the original flat rates above) and **Rest of Uganda**
-   (the default — higher rates for Standard/Express, and Same-day priced at UGX 35,000 rather than switched
-   off, since per user decision Same-day isn't hard-blocked outside Kampala, just priced for the distance).
+   ships with seven zones seeded, priced by rough real-world distance from the Kampala warehouse — per
+   explicit user correction, Central/Eastern/Western/Northern/Southern must each charge different rates, not
+   share one flat "upcountry" price:
+   - **Kampala Metro** — the original flat rates (Standard free, Express UGX 8,000, Same-day UGX 12,000).
+   - **Central Uganda (Rest)** — the nearest upcountry towns (Entebbe, Mukono, Wakiso, etc.), the cheapest
+     upcountry tier.
+   - **Eastern**, **Southern** (greater Masaka/Ankole/Kigezi), and **Western** (Toro/Bunyoro) — increasingly
+     higher rates as the towns get farther from Kampala.
+   - **Northern** — the farthest and most expensive tier (Gulu, Lira, Arua, Kitgum...), with Same-day left
+     **unavailable** rather than just expensive: those towns are realistically 5-8 hours' drive one way, past
+     what a same-day promise can honestly cover.
+   - **Rest of Uganda** — the **default** fallback for anything matching none of the above, priced
+     conservatively (a typo or unlisted village shouldn't get Kampala's cheap rate by accident).
 3. Matching is case-insensitive and substring-tolerant against the town list (so "Kampala", "kampala uganda,"
    etc. all match) — it is **not** a dropdown of official Uganda administrative divisions, since the
    storefront's City field has always been free text. Add every spelling/neighborhood variant you want a zone

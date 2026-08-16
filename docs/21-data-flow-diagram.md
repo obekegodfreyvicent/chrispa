@@ -6,7 +6,7 @@ blocks, not Mermaid — `md_to_docx.py` (the script that generates this document
 blocks to literal monospace text but does not render Mermaid syntax as an actual diagram, so Mermaid would only
 work in the `.md` and show as broken syntax in Word. ASCII art renders identically and correctly in both.
 
-**Freshness note**: generated against commit `7e197b9` (2026-08-17), the schema/service layer as of that
+**Freshness note**: generated against commit `c917b38` (2026-08-17), the schema/service layer as of that
 commit. This is a point-in-time artifact, not auto-synced to the live codebase — re-generate by hand after a
 schema or major flow change, the same convention as
 [`22-entity-relationship-diagram.md`](./22-entity-relationship-diagram.md) and

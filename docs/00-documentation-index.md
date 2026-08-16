@@ -190,9 +190,13 @@ them blindly during a stale-looking review.
   `isDefault` as the fallback for an unmatched city) replaces that flat table — `CheckoutService` now matches
   the order's destination and charges that zone's rate, rejecting a delivery method the matched zone doesn't
   offer rather than silently mispricing it. Managed at Admin → Shipping Zones (`OWNER`/`STORE_MANAGER`); a
-  public `GET /shipping/quote` lets the storefront show live prices as the customer types their city. Per
-  user decision, Same-day is priced higher outside Kampala rather than hard-blocked there. See FR-5.4a in
-  `docs/SRS.md`, [`03`](./03-database-design.md), [`06`](./06-api-design-and-documentation.md), and
+  public `GET /shipping/quote` lets the storefront show live prices as the customer types their city. Seeded
+  with seven zones (per explicit user correction — Central/Eastern/Western/Northern/Southern must each price
+  differently, not share one flat "upcountry" rate), scaled by rough real-world distance from the Kampala
+  warehouse: Kampala Metro (cheapest) → Central Uganda (Rest) → Eastern → Southern → Western → Northern
+  (farthest, most expensive, and the one zone with no Same-day option at all — realistically 5-8 hours' drive
+  one way) → Rest of Uganda (the `isDefault` fallback). See FR-5.4a in `docs/SRS.md`,
+  [`03`](./03-database-design.md), [`06`](./06-api-design-and-documentation.md), and
   [`16`](./16-user-and-administrator-procedures.md).
 - **Three near-term priorities** stand out across this whole set as worth doing before the rest: push the
   repo to a remote, add database backups, and wire forgot-password/login-alert/staff-temp-password delivery

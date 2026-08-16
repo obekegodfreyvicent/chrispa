@@ -224,11 +224,17 @@ Requirements are grouped to match the **Feature groups** already annotated in th
   takes effect on the next checkout immediately, no deploy needed; a public `GET /shipping/quote?city=` (no
   auth) lets the storefront show live per-method pricing as the customer types their city, before they
   submit. Per user decision, Same-day delivery is **not hard-blocked outside Kampala** at the code level — an
-  admin can price (or switch off) any method for any zone; the two seeded zones price Same-day everywhere,
-  just more for "Rest of Uganda" (UGX 35,000) than "Kampala Metro" (UGX 12,000). Each order snapshots which
-  zone applied (`Order.shippingZoneName`) alongside the numeric fee it already stored, so a later rate change
-  never rewrites what a past order actually paid — same "snapshot, don't live-join" convention as
-  `OrderItem.vendorId`/HR's `Payslip` rows.
+  admin can price (or switch off) any method for any zone. **Pricing scales by region, not a single
+  "upcountry" rate** (added later this session, per explicit user correction — Central/Eastern/Western/
+  Northern/Southern must not all charge the same): seeded with seven zones — Kampala Metro (cheapest, UGX 0/
+  8,000/12,000), Central Uganda (Rest) (nearest upcountry towns, e.g. Entebbe/Mukono), Eastern, Southern
+  (greater Masaka/Ankole/Kigezi), Western (Toro/Bunyoro), and Northern (farthest — Gulu/Lira/Arua/Kitgum,
+  priced highest and with Same-day left unavailable, `null`, since 5-8 hours' drive one way is past what a
+  same-day promise can honestly cover) — plus "Rest of Uganda" as the `isDefault` fallback for a city
+  matching none of the named zones' `towns`, priced conservatively rather than defaulting to Kampala's
+  cheaper rates. Each order snapshots which zone applied (`Order.shippingZoneName`) alongside the numeric fee
+  it already stored, so a later rate change never rewrites what a past order actually paid — same "snapshot,
+  don't live-join" convention as `OrderItem.vendorId`/HR's `Payslip` rows.
 
 **FR-6 — Order Tracking** (`page-order-track`)
 - FR-6.1 Visual status pipeline: Placed → Packed → Shipped → Delivered.
