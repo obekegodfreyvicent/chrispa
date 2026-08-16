@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { authedFetch, getAccessToken } from '@/lib/auth-client';
-import { formatDualPrice } from '@/lib/api';
+import { apiGet, formatDualPrice } from '@/lib/api';
 import { Card, Chip, ButtonGold } from '@/components/ui';
 
 interface CartItem {
@@ -20,13 +20,15 @@ interface CartResponse {
 type DeliveryMethod = 'STANDARD' | 'EXPRESS' | 'SAME_DAY';
 type PaymentMethod = 'CASH_ON_DELIVERY' | 'MOBILE_MONEY' | 'CARD';
 
-// Mirrors CheckoutService's DELIVERY_FEES_UGX — used here only to show an
-// estimate before the server computes the authoritative total.
-const DELIVERY_FEES_UGX: Record<DeliveryMethod, number> = { STANDARD: 0, EXPRESS: 8000, SAME_DAY: 12000 };
-const DELIVERY_LABELS: Record<DeliveryMethod, string> = {
-  STANDARD: 'Standard · Free',
-  EXPRESS: 'Express · UGX 8,000',
-  SAME_DAY: 'Same-day (Kla) · UGX 12,000',
+interface ShippingQuote {
+  zoneName: string;
+  rates: Record<DeliveryMethod, { available: boolean; feeUgx: number | null }>;
+}
+
+const DELIVERY_METHOD_NAMES: Record<DeliveryMethod, string> = {
+  STANDARD: 'Standard',
+  EXPRESS: 'Express',
+  SAME_DAY: 'Same-day',
 };
 
 // FR-5: Checkout. Guest checkout (FR-5.2) isn't built — requires login, same
@@ -47,6 +49,7 @@ export default function CheckoutPage() {
   const [couponCode, setCouponCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [quote, setQuote] = useState<ShippingQuote | null>(null);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -59,6 +62,37 @@ export default function CheckoutPage() {
       .then(setCart)
       .finally(() => setLoading(false));
   }, []);
+
+  // Shipping is priced by destination + delivery method server-side
+  // (ShippingZonesService) — this just fetches the same quote to show a
+  // live estimate and disable delivery methods the matched zone doesn't
+  // offer, before the customer submits. Debounced so every keystroke in the
+  // City field doesn't fire a request; re-fetches on delivery method change
+  // too since the effect depends on it (a wasted call, but calling the
+  // read-only quote endpoint has no side effects worth guarding against).
+  useEffect(() => {
+    if (!city.trim()) {
+      setQuote(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      apiGet<ShippingQuote>(`/shipping/quote?city=${encodeURIComponent(city.trim())}`)
+        .then(setQuote)
+        .catch(() => setQuote(null));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [city]);
+
+  // If the currently-selected method becomes unavailable for the newly
+  // matched zone (or the city changed enough to reshuffle rates), fall back
+  // to Standard rather than silently submitting an order for a method the
+  // quote says isn't offered here.
+  useEffect(() => {
+    if (quote && !quote.rates[deliveryMethod]?.available) {
+      setDeliveryMethod('STANDARD');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote]);
 
   if (loading) return <div className="p-4 sm:p-6 max-w-4xl mx-auto text-sm text-text-2">Loading…</div>;
 
@@ -76,7 +110,7 @@ export default function CheckoutPage() {
 
   const items = cart?.items ?? [];
   const subtotal = items.reduce((sum, i) => sum + (i.product.priceUgx + (i.variant?.priceDelta ?? 0)) * i.qty, 0);
-  const shippingFee = DELIVERY_FEES_UGX[deliveryMethod];
+  const shippingFee = quote?.rates[deliveryMethod]?.feeUgx ?? 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -133,13 +167,27 @@ export default function CheckoutPage() {
             </div>
 
             <div className="border-t border-surface-2 my-4" />
-            <div className="text-[10px] uppercase text-text-2 mb-1">Delivery Method</div>
+            <div className="text-[10px] uppercase text-text-2 mb-1">
+              Delivery Method{quote && <span className="normal-case text-text-2"> — pricing for {quote.zoneName}</span>}
+            </div>
             <div className="flex gap-2.5 flex-wrap">
-              {(Object.keys(DELIVERY_LABELS) as DeliveryMethod[]).map((m) => (
-                <button type="button" key={m} onClick={() => setDeliveryMethod(m)}>
-                  <Chip gold={deliveryMethod === m}>{DELIVERY_LABELS[m]}</Chip>
-                </button>
-              ))}
+              {(Object.keys(DELIVERY_METHOD_NAMES) as DeliveryMethod[]).map((m) => {
+                const rate = quote?.rates[m];
+                const available = !quote || rate?.available;
+                const priceLabel = !rate ? '…' : rate.feeUgx === 0 ? 'Free' : rate.feeUgx != null ? formatDualPrice(rate.feeUgx) : 'Unavailable';
+                return (
+                  <button
+                    type="button"
+                    key={m}
+                    disabled={!available}
+                    onClick={() => setDeliveryMethod(m)}
+                    className={available ? '' : 'opacity-40 cursor-not-allowed'}
+                    title={available ? undefined : `${DELIVERY_METHOD_NAMES[m]} isn't offered for ${quote?.zoneName}`}
+                  >
+                    <Chip gold={deliveryMethod === m}>{DELIVERY_METHOD_NAMES[m]} · {priceLabel}</Chip>
+                  </button>
+                );
+              })}
             </div>
           </Card>
 

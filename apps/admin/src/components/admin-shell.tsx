@@ -14,6 +14,7 @@ const NAV = [
   { href: '/customers', icon: '◈', label: 'Customers (CRM)' },
   { href: '/support-tickets', icon: '✉', label: 'Support Tickets' },
   { href: '/marketing', icon: '%', label: 'Marketing & Promos' },
+  { href: '/shipping-zones', icon: '✈', label: 'Shipping Zones' },
   { href: '/cms', icon: '▧', label: 'CMS / Site Builder' },
   { href: '/settings', icon: '⚙', label: 'Users & Settings' },
   { href: '/activity-log', icon: '≡', label: 'Activity Log' },
@@ -85,10 +86,11 @@ function sectionHasActiveItem(items: { href: string }[], pathname: string | null
 // Financial & Accounting; the difference between them (Store
 // Manager has full read/write, Fulfillment is read-only except
 // order-status transitions) is enforced server-side (RolesGuard), not by
-// which tabs show here. Support Tickets is further restricted within that
-// Admin/Backend filter to Store Manager only — Fulfillment isn't in
-// AdminSupportController's @Roles() list, so hide the link rather than
-// showing one that 403s. Financial & Accounting is Owner-only outright —
+// which tabs show here. Support Tickets and Shipping Zones are further
+// restricted within that Admin/Backend filter to Store Manager only —
+// Fulfillment isn't in AdminSupportController's/AdminShippingZonesController's
+// @Roles() lists, so hide the link rather than showing one that 403s.
+// Financial & Accounting is Owner-only outright —
 // the whole section is hidden rather than filtering an item out of it,
 // since every /admin/finance/* endpoint is Owner-only server-side (see
 // EntitiesController's Access Control note). `role === null` covers the
@@ -113,7 +115,7 @@ function visibleSections(role: UserRole | null) {
               (item) =>
                 item.href !== '/settings' &&
                 item.href !== '/activity-log' &&
-                (role === 'STORE_MANAGER' || item.href !== '/support-tickets'),
+                (role === 'STORE_MANAGER' || (item.href !== '/support-tickets' && item.href !== '/shipping-zones')),
             ),
           }
         : s,

@@ -29,6 +29,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentMethodsModule } from './modules/payment-methods/payment-methods.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ProfileModule } from './modules/profile/profile.module';
+import { ShippingModule } from './modules/shipping/shipping.module';
 import { SupportModule } from './modules/support/support.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
 
@@ -43,6 +44,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     CatalogModule,
     CartModule,
     CheckoutModule,
+    ShippingModule,
     OrdersModule,
     DeliveryModule,
     InventoryModule,

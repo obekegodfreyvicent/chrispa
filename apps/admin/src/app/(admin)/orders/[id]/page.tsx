@@ -37,6 +37,7 @@ interface OrderDetail {
   status: string;
   subtotalUgx: number;
   shippingFeeUgx: number;
+  shippingZoneName: string | null;
   discountUgx: number;
   vatUgx: number;
   totalUgx: number;
@@ -213,7 +214,10 @@ export default function AdminOrderDetailPage(props: PageProps<'/orders/[id]'>) {
           <div className="text-xs">Payment: {order.paymentMethod?.replace(/_/g, ' ') ?? '—'}</div>
           <div className="border-t border-surface-2 my-3" />
           <div className="flex justify-between text-xs mb-1"><span className="text-text-2">Subtotal</span><span>UGX {order.subtotalUgx.toLocaleString()}</span></div>
-          <div className="flex justify-between text-xs mb-1"><span className="text-text-2">Shipping</span><span>UGX {order.shippingFeeUgx.toLocaleString()}</span></div>
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-text-2">Shipping{order.shippingZoneName && ` (${order.shippingZoneName})`}</span>
+            <span>UGX {order.shippingFeeUgx.toLocaleString()}</span>
+          </div>
           <div className="flex justify-between text-xs mb-1"><span className="text-text-2">Discount</span><span>− UGX {order.discountUgx.toLocaleString()}</span></div>
           <div className="flex justify-between text-xs mb-1"><span className="text-text-2">VAT (18%)</span><span>UGX {order.vatUgx.toLocaleString()}</span></div>
           <div className="flex justify-between text-sm font-semibold mt-2"><span>Total</span><span className="text-gold-light">UGX {order.totalUgx.toLocaleString()}</span></div>

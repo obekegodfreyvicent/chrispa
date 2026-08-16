@@ -354,6 +354,48 @@ async function main() {
     }),
   ]);
 
+  // Shipping zones (per user decision, not in the original SRS) — replaces
+  // the old flat per-delivery-method fee table; CheckoutService now prices
+  // by destination + delivery method via ShippingZonesService. Two starter
+  // zones so checkout works out of the box; an admin can add/edit more via
+  // Admin → Shipping Zones. "Rest of Uganda" is the isDefault fallback for
+  // any city that doesn't match Kampala Metro's town list — deliberately
+  // not "Kampala Metro" itself, so an unrecognized/misspelled town gets
+  // priced as upcountry (safer to overcharge shipping than undercharge it)
+  // rather than silently defaulting to Kampala's cheaper rates.
+  const kampalaZone = await prisma.shippingZone.findFirst({ where: { name: 'Kampala Metro' } });
+  if (!kampalaZone) {
+    await prisma.shippingZone.create({
+      data: {
+        name: 'Kampala Metro',
+        towns: [
+          'Kampala', 'Nakawa', 'Kawempe', 'Makindye', 'Rubaga', 'Central Division',
+          'Ntinda', 'Bugolobi', 'Muyenga', 'Kololo', 'Nakasero', 'Naalya', 'Kyanja',
+          'Kisaasi', 'Bukoto', 'Kabalagala', 'Namuwongo',
+        ],
+        isDefault: false,
+        standardFeeUgx: 0,
+        expressFeeUgx: 8000,
+        sameDayFeeUgx: 12000,
+        sortOrder: 0,
+      },
+    });
+  }
+  const upcountryZone = await prisma.shippingZone.findFirst({ where: { name: 'Rest of Uganda' } });
+  if (!upcountryZone) {
+    await prisma.shippingZone.create({
+      data: {
+        name: 'Rest of Uganda',
+        towns: [],
+        isDefault: true,
+        standardFeeUgx: 15000,
+        expressFeeUgx: 25000,
+        sameDayFeeUgx: 35000,
+        sortOrder: 1,
+      },
+    });
+  }
+
   // Wellness Kit bundle — from the Marketing wireframe's Bundle Builder panel
   const sleepAid = await prisma.product.findUniqueOrThrow({ where: { sku: 'CDL-003' } });
   const sleepHoney = await prisma.product.findUniqueOrThrow({ where: { sku: 'HNY-003' } });

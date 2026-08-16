@@ -1,11 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Coupon, CouponType, DeliveryMethod, Prisma, UserRole } from '@prisma/client';
+import { Coupon, CouponType, Prisma, UserRole } from '@prisma/client';
 import { ActivityLogService, ActorInfo, deriveActorType, RequestInfo } from '../../common/activity-log/activity-log.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
+import { ShippingZonesService } from '../shipping/shipping-zones.service';
 import { CheckoutDto, PaymentMethod } from './dto/checkout.dto';
 
 // FR-5: Checkout / order creation.
+//
+// Shipping fee (per user decision, not in the original SRS) is priced by
+// BOTH destination and delivery method via ShippingZonesService — replaces
+// the old flat DELIVERY_FEES_UGX table that ignored the shipping address
+// entirely. See that service for the zone-matching/fallback logic.
 //
 // Simplifications, tracked as follow-up work in docs/SRS.md:
 // - Single fulfillment warehouse ("Kampala Central") — real multi-warehouse
@@ -25,12 +31,6 @@ import { CheckoutDto, PaymentMethod } from './dto/checkout.dto';
 //   (PAY-FR-1, docs/SRS.md §21) — the order exists (and stock is already
 //   decremented) before payment succeeds or fails; see PaymentsService for
 //   why there's no reservation/cleanup job for an abandoned payment.
-const DELIVERY_FEES_UGX: Record<DeliveryMethod, number> = {
-  STANDARD: 0,
-  EXPRESS: 8000,
-  SAME_DAY: 12000,
-};
-
 const POINTS_PER_UGX_SPENT = 10 / 1000; // 10 pts per UGX 1,000 spent — SRS FR-18.3
 const FULFILLMENT_WAREHOUSE_NAME = 'Kampala Central';
 // TAX-FR-1 (docs/SRS.md §21): Uganda's standard VAT rate. Applied to the
@@ -44,6 +44,7 @@ export class CheckoutService {
     private readonly prisma: PrismaService,
     private readonly activityLog: ActivityLogService,
     private readonly payments: PaymentsService,
+    private readonly shipping: ShippingZonesService,
   ) {}
 
   async checkout(actor: ActorInfo, dto: CheckoutDto, context: RequestInfo = {}) {
@@ -51,6 +52,14 @@ export class CheckoutService {
     if (dto.paymentMethod !== PaymentMethod.CASH_ON_DELIVERY && !dto.returnUrl) {
       throw new BadRequestException('returnUrl is required for Mobile Money/Card checkout.');
     }
+
+    // Priced by destination + delivery method (admin-managed shipping
+    // zones, per user decision) — computed outside the transaction below
+    // since it's independent of the cart/warehouse state read there, same
+    // reasoning as why coupon validation doesn't need tx's isolation either.
+    // Throws (BadRequestException) if the matched zone doesn't offer
+    // dto.deliveryMethod at all, before any cart/stock work happens.
+    const { zoneName, feeUgx: shippingFeeUgx } = await this.shipping.priceFor(dto.shippingAddress.city, dto.deliveryMethod);
 
     const { order, customer } = await this.prisma.$transaction(async (tx) => {
       const cart = await tx.cart.findUnique({
@@ -82,7 +91,6 @@ export class CheckoutService {
         const unitPrice = item.product.priceUgx + (item.variant?.priceDelta ?? 0);
         return sum + unitPrice * item.qty;
       }, 0);
-      const shippingFeeUgx = DELIVERY_FEES_UGX[dto.deliveryMethod];
 
       let discountUgx = 0;
       let coupon: Coupon | null = null;
@@ -118,6 +126,7 @@ export class CheckoutService {
           vatUgx,
           totalUgx,
           deliveryMethod: dto.deliveryMethod,
+          shippingZoneName: zoneName,
           timeSlot: dto.timeSlot,
           paymentMethod: dto.paymentMethod,
           shippingAddress: dto.shippingAddress as unknown as Prisma.InputJsonValue,

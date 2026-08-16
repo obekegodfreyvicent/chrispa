@@ -515,6 +515,13 @@ model Order {
   vatUgx          Int            @default(0)
   totalUgx        Int
   deliveryMethod  DeliveryMethod @default(STANDARD)
+  // Snapshotted at checkout from the ShippingZone that matched the order's
+  // shippingAddress.city at that moment (see ShippingZonesService.quote())
+  // — same "never a live join" reasoning as Payslip/OrderItem.vendorId: a
+  // zone's name/fees can change later without silently rewriting what a
+  // past order actually paid or which zone applied to it. Null on orders
+  // placed before this feature existed.
+  shippingZoneName String?
   timeSlot        String?
   paymentMethod   String?
   shippingAddress Json
@@ -538,6 +545,48 @@ model Order {
   @@index([userId])
   @@index([warehouseId])
   @@index([status])
+}
+
+// Admin-managed shipping pricing (per user decision, not in the original
+// SRS) — replaces the old flat DELIVERY_FEES_UGX table in CheckoutService
+// that priced every order by deliveryMethod alone, ignoring destination
+// entirely. CheckoutService.matchZone() (via ShippingZonesService) matches
+// the order's shippingAddress.city against `towns` (case-insensitive,
+// substring-tolerant — see that method's comment) and falls back to
+// whichever zone has isDefault: true if nothing matches.
+model ShippingZone {
+  id   String @id @default(uuid())
+  name String @unique
+
+  // Free-text town/city names an admin considers part of this zone — not a
+  // foreign key to any canonical Uganda-locations table (none exists in
+  // this schema, and the storefront's own City field is free text too).
+  towns String[]
+
+  // Exactly one zone must have isDefault: true at any time — the catch-all
+  // for a city that matches no zone's `towns` list. Enforced in
+  // ShippingZonesService (create/update/delete), not a DB constraint —
+  // Postgres has no native "exactly one row true" constraint this schema
+  // uses elsewhere.
+  isDefault Boolean @default(false)
+
+  // Per-delivery-method fee for this zone. Null means that method isn't
+  // offered to this zone at all (CheckoutService rejects it with a clear
+  // error) — distinct from 0, which means offered for free. Per user
+  // decision, Same-day is NOT hard-blocked outside Kampala at the code
+  // level; an admin can price it however they want per zone, including
+  // leaving it null to switch it off for a specific zone.
+  standardFeeUgx Int?
+  expressFeeUgx  Int?
+  sameDayFeeUgx  Int?
+
+  // Match priority when a town name could plausibly belong to more than one
+  // zone (admin data-entry overlap) — lower sorts first. Also the admin
+  // list page's display order.
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
 enum DeliveryStatus {
