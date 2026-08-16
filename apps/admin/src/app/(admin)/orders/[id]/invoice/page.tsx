@@ -83,7 +83,7 @@ function ReceivedStamp({ confirmedAt }: { confirmedAt: string }) {
           <br />
           GOOD CONDITION
         </div>
-        <div className="text-[6.5px] mt-1.5">{fmtDate(confirmedAt)}</div>
+        <div className="text-[6.5px] mt-1.5">{fmtDateTime(confirmedAt)}</div>
       </div>
     </div>
   );
