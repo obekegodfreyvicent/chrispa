@@ -164,7 +164,7 @@ finalized:
 
 Your receipt shows ChrisPa's logo, business contact details, every item you ordered (with quantities and
 prices), your subtotal/shipping/discount/VAT/total, your payment method, and — since you've just confirmed
-it — a **"Received in Good Condition"** stamp with the date you confirmed. Click **Print / Save as PDF** to
+it — a **"Received in Good Condition"** stamp with the date and time you confirmed. Click **Print / Save as PDF** to
 print it or save it as a PDF through your browser's print dialog (there's no separate download button — this
 *is* the download).
 

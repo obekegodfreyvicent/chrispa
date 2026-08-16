@@ -179,6 +179,11 @@ them blindly during a stale-looking review.
   [`23`](./23-data-dictionary.md) have been updated in `.md` to match but two of the three still have
   unregenerated `.docx` files (open in a desktop word processor as of this writing — see those documents'
   own freshness notes for current status).
+- **Receipt stamp now shows date and time** (commit `14d851b`, per user request) — the "RECEIVED IN GOOD
+  CONDITION" seal on both the customer's and staff's printable receipt previously showed only the
+  confirmation date; both now show the hour too. See `docs/SRS.md`'s "virtual stamp" note and
+  [`19-storefront-user-manual.md`](./19-storefront-user-manual.md) (both updated in `.md`; their `.docx`s
+  are among the ones currently open, per the note above).
 - **Three near-term priorities** stand out across this whole set as worth doing before the rest: push the
   repo to a remote, add database backups, and wire forgot-password/login-alert/staff-temp-password delivery
   to the email+SMS services (registration OTP already uses real Brevo (HTTP API, not SMTP — see
