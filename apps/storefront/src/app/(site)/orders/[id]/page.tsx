@@ -15,6 +15,9 @@ interface OrderDetail {
   delivery: {
     status: string;
     driver: { name: string; phone: string | null };
+    currentLat: number | null;
+    currentLng: number | null;
+    lastLocationAt: string | null;
   } | null;
 }
 
@@ -26,6 +29,10 @@ const DELIVERY_STATUS_LABEL: Record<string, string> = {
   DELIVERED: 'Your order has been delivered',
   FAILED: 'Delivery attempt unsuccessful — our team will be in touch',
 };
+
+const EN_ROUTE = ['EN_ROUTE_TO_PICKUP', 'EN_ROUTE_TO_CUSTOMER'];
+const mapsUrl = (lat: number, lng: number) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('en-UG', { hour: 'numeric', minute: '2-digit' });
 
 const STEPS = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
 
@@ -91,6 +98,19 @@ export default function OrderTrackingPage(props: PageProps<'/orders/[id]'>) {
           <div className="text-xs text-text-2 mt-1">
             Driver: {order.delivery.driver.name}{order.delivery.driver.phone ? ` · ${order.delivery.driver.phone}` : ''}
           </div>
+          {EN_ROUTE.includes(order.delivery.status) && order.delivery.currentLat && order.delivery.currentLng && (
+            <div className="text-xs text-text-2 mt-1">
+              Last known location{order.delivery.lastLocationAt ? ` (${fmtTime(order.delivery.lastLocationAt)})` : ''} ·{' '}
+              <a
+                href={mapsUrl(order.delivery.currentLat, order.delivery.currentLng)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-gold-light"
+              >
+                View on map
+              </a>
+            </div>
+          )}
         </Card>
       )}
 

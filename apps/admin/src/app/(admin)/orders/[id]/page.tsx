@@ -9,16 +9,18 @@ interface OrderItem {
   id: string;
   qty: number;
   unitPriceUgx: number;
-  product: { name: string };
+  product: { name: string } | null;
   variant: { size: string } | null;
 }
 interface Driver {
   id: string;
   name: string;
   phone: string | null;
+  driverStatus?: string;
 }
 interface Delivery {
   status: string;
+  priority: string;
   driver: Driver;
   pickupLat: number | null;
   pickupLng: number | null;
@@ -79,6 +81,7 @@ export default function AdminOrderDetailPage(props: PageProps<'/orders/[id]'>) {
   const [pending, setPending] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
+  const [assignPriority, setAssignPriority] = useState<'NORMAL' | 'URGENT'>('NORMAL');
 
   function load() {
     authedFetch(`/admin/orders/${id}`)
@@ -106,7 +109,7 @@ export default function AdminOrderDetailPage(props: PageProps<'/orders/[id]'>) {
       const res = await authedFetch(`/admin/orders/${id}/assign-driver`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ driverId }),
+        body: JSON.stringify({ driverId, priority: assignPriority }),
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
@@ -221,11 +224,12 @@ export default function AdminOrderDetailPage(props: PageProps<'/orders/[id]'>) {
         <div className="text-[10px] uppercase text-text-2 mb-2">Delivery / Driver</div>
         {order.delivery ? (
           <div className="text-xs space-y-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span>{order.delivery.driver.name}{order.delivery.driver.phone ? ` · ${order.delivery.driver.phone}` : ''}</span>
               <Status variant={order.delivery.status === 'DELIVERED' ? 'ok' : order.delivery.status === 'FAILED' ? 'danger' : 'pending'}>
                 {order.delivery.status.replace(/_/g, ' ')}
               </Status>
+              {order.delivery.priority === 'URGENT' && <Chip className="!text-danger !border-danger">Urgent</Chip>}
             </div>
             {order.delivery.pickedUpAt && (
               <div className="text-text-2">
@@ -249,7 +253,7 @@ export default function AdminOrderDetailPage(props: PageProps<'/orders/[id]'>) {
                 <a href={mapsUrl(order.delivery.currentLat, order.delivery.currentLng)} target="_blank" rel="noreferrer" className="text-gold-light">map</a>
               </div>
             )}
-            <div className="pt-2">
+            <div className="pt-2 flex items-center gap-2 flex-wrap">
               <span className="text-text-2">Reassign: </span>
               <select
                 disabled={assigning}
@@ -259,13 +263,21 @@ export default function AdminOrderDetailPage(props: PageProps<'/orders/[id]'>) {
               >
                 <option value="" disabled>Choose a driver…</option>
                 {drivers?.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                  <option key={d.id} value={d.id}>{d.name}{d.driverStatus ? ` (${d.driverStatus.replace(/_/g, ' ').toLowerCase()})` : ''}</option>
                 ))}
+              </select>
+              <select
+                value={assignPriority}
+                onChange={(e) => setAssignPriority(e.target.value as 'NORMAL' | 'URGENT')}
+                className="bg-white border border-[#CBDCC1] rounded-md px-2 py-1 text-[11px]"
+              >
+                <option value="NORMAL">Normal priority</option>
+                <option value="URGENT">Urgent</option>
               </select>
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               disabled={assigning}
               onChange={(e) => assignDriver(e.target.value)}
@@ -274,8 +286,16 @@ export default function AdminOrderDetailPage(props: PageProps<'/orders/[id]'>) {
             >
               <option value="" disabled>Choose a driver…</option>
               {drivers?.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
+                <option key={d.id} value={d.id}>{d.name}{d.driverStatus ? ` (${d.driverStatus.replace(/_/g, ' ').toLowerCase()})` : ''}</option>
               ))}
+            </select>
+            <select
+              value={assignPriority}
+              onChange={(e) => setAssignPriority(e.target.value as 'NORMAL' | 'URGENT')}
+              className="bg-white border border-[#CBDCC1] rounded-md px-2.5 py-2 text-[11.5px]"
+            >
+              <option value="NORMAL">Normal priority</option>
+              <option value="URGENT">Urgent</option>
             </select>
             {drivers?.length === 0 && (
               <span className="text-xs text-text-2">
@@ -300,7 +320,7 @@ export default function AdminOrderDetailPage(props: PageProps<'/orders/[id]'>) {
           <tbody>
             {order.items.map((item) => (
               <tr key={item.id} className="border-t border-surface-2">
-                <td className="p-2.5">{item.product.name}{item.variant ? ` · ${item.variant.size}` : ''}</td>
+                <td className="p-2.5">{item.product?.name ?? '(product no longer available)'}{item.variant ? ` · ${item.variant.size}` : ''}</td>
                 <td className="p-2.5">{item.qty}</td>
                 <td className="p-2.5">UGX {item.unitPriceUgx.toLocaleString()}</td>
               </tr>

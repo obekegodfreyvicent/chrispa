@@ -25,6 +25,14 @@ export class AdminDeliveriesController {
     return this.delivery.listDrivers();
   }
 
+  // Feeds the admin Dashboard's "active deliveries" widget — see
+  // DeliveryService.adminSummary()'s comment on why this is computed on
+  // read rather than a stored/cached metric.
+  @Get('admin/deliveries/summary')
+  summary() {
+    return this.delivery.adminSummary();
+  }
+
   @Patch('admin/orders/:id/assign-driver')
   assign(
     @CurrentUser() user: { userId: string; role: string },
@@ -32,6 +40,6 @@ export class AdminDeliveriesController {
     @Body() dto: AssignDriverDto,
     @Req() req: FastifyRequest,
   ) {
-    return this.delivery.assign(id, dto.driverId, user, requestContext(req));
+    return this.delivery.assign(id, dto.driverId, dto.priority, user, requestContext(req));
   }
 }

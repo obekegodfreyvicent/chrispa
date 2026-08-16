@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { authedFetch, getAccessToken } from '@/lib/auth-client';
 import { useRefetchOnFocus } from '@/lib/use-refetch-on-focus';
-import { Card, Chip, Status, ButtonGhost } from '@/components/ui';
+import { Card, Chip, Status, ButtonGhost, ButtonGold, ButtonOutline } from '@/components/ui';
 
 interface Delivery {
   id: string;
   status: string;
+  priority: string;
   assignedAt: string;
   order: {
     orderNumber: string;
@@ -16,6 +17,12 @@ interface Delivery {
     shippingAddress: { recipient?: string; line1?: string; city?: string };
   };
 }
+
+const DRIVER_STATUS_LABEL: Record<string, string> = {
+  OFFLINE: 'Offline',
+  AVAILABLE: 'Available',
+  ON_DELIVERY: 'On a delivery',
+};
 
 const STATUS_VARIANT: Record<string, 'ok' | 'pending' | 'danger'> = {
   ASSIGNED: 'pending',
@@ -33,8 +40,10 @@ const ACTIVE = ['ASSIGNED', 'EN_ROUTE_TO_PICKUP', 'PICKED_UP', 'EN_ROUTE_TO_CUST
 // MyDeliveriesController), not just role-gated.
 export default function MyDeliveriesPage() {
   const [deliveries, setDeliveries] = useState<Delivery[] | null>(null);
+  const [driverStatus, setDriverStatus] = useState<string | null>(null);
   const [authed, setAuthed] = useState(true);
   const [forbidden, setForbidden] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState(false);
 
   function load() {
     if (!getAccessToken()) {
@@ -52,6 +61,27 @@ export default function MyDeliveriesPage() {
     }).then((data) => {
       if (data) setDeliveries(data);
     });
+    authedFetch('/driver/status')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setDriverStatus(data?.driverStatus ?? null));
+  }
+
+  async function toggleStatus() {
+    const next = driverStatus === 'AVAILABLE' ? 'OFFLINE' : 'AVAILABLE';
+    setTogglingStatus(true);
+    try {
+      const res = await authedFetch('/driver/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: next }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDriverStatus(data.driverStatus);
+      }
+    } finally {
+      setTogglingStatus(false);
+    }
   }
 
   useRefetchOnFocus(load);
@@ -88,6 +118,22 @@ export default function MyDeliveriesPage() {
         <ButtonGhost onClick={load}>Refresh</ButtonGhost>
       </div>
 
+      <Card className="mb-4 flex justify-between items-center">
+        <div>
+          <div className="text-[10px] uppercase text-text-2 mb-1">Availability</div>
+          <Status variant={driverStatus === 'AVAILABLE' ? 'ok' : driverStatus === 'ON_DELIVERY' ? 'pending' : 'danger'}>
+            {driverStatus ? DRIVER_STATUS_LABEL[driverStatus] ?? driverStatus : '—'}
+          </Status>
+        </div>
+        {driverStatus !== 'ON_DELIVERY' && (
+          driverStatus === 'AVAILABLE' ? (
+            <ButtonOutline disabled={togglingStatus} onClick={toggleStatus}>Go offline</ButtonOutline>
+          ) : (
+            <ButtonGold disabled={togglingStatus} onClick={toggleStatus}>Go available</ButtonGold>
+          )
+        )}
+      </Card>
+
       <div className="text-[10px] uppercase text-text-2 mb-2">Active</div>
       {active.length === 0 ? (
         <Card className="mb-4"><p className="text-sm text-text-2">No active deliveries assigned right now.</p></Card>
@@ -98,7 +144,10 @@ export default function MyDeliveriesPage() {
               <Card className="hover:border-gold-dark transition-colors">
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="text-sm font-semibold">#{d.order.orderNumber}</div>
+                    <div className="text-sm font-semibold flex items-center gap-1.5">
+                      #{d.order.orderNumber}
+                      {d.priority === 'URGENT' && <Chip className="!text-danger !border-danger">Urgent</Chip>}
+                    </div>
                     <div className="text-xs text-text-2 mt-0.5">
                       {d.order.shippingAddress?.recipient} — {d.order.shippingAddress?.line1}, {d.order.shippingAddress?.city}
                     </div>

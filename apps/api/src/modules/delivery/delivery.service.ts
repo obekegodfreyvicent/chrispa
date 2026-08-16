@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DeliveryStatus, OrderStatus, Prisma, UserRole } from '@prisma/client';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { DeliveryPriority, DeliveryStatus, DriverStatus, OrderStatus, Prisma, UserRole } from '@prisma/client';
 import { ActivityLogService, ActorInfo, deriveActorType, RequestInfo } from '../../common/activity-log/activity-log.service';
+import { MailService } from '../../common/notifications/mail.service';
+import { SmsService } from '../../common/notifications/sms.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
 
@@ -30,6 +32,16 @@ const ALLOWED_DELIVERY_TRANSITIONS: Record<DeliveryStatus, DeliveryStatus[]> = {
 // Order.status steps a Delivery's PICKED_UP/DELIVERED transitions must mirror.
 const ORDER_PROGRESSION: OrderStatus[] = [OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED];
 
+// Customer-facing copy per delivery status — sent by notifyCustomer() below.
+// Deliberately terse plain text, same style as OtpService's messages; no
+// HTML template system exists in this codebase yet.
+const STATUS_MESSAGE: Partial<Record<DeliveryStatus, (orderNumber: string, driverName: string) => string>> = {
+  ASSIGNED: (o, d) => `${d} has been assigned to deliver your ChrisPa order #${o}.`,
+  PICKED_UP: (o, d) => `${d} has picked up your ChrisPa order #${o} and is on the way.`,
+  DELIVERED: (o) => `Your ChrisPa order #${o} has been delivered. Enjoy!`,
+  FAILED: (o) => `We couldn't complete delivery of your ChrisPa order #${o} — our team will be in touch shortly.`,
+};
+
 // Driver App (per user request — see the class comment on the Delivery
 // model in schema.prisma for the full design rationale: 1:1 with Order,
 // GPS-capture-and-deep-link rather than in-app routing, status transitions
@@ -37,10 +49,14 @@ const ORDER_PROGRESSION: OrderStatus[] = [OrderStatus.PROCESSING, OrderStatus.SH
 // transition/revenue-recognition logic).
 @Injectable()
 export class DeliveryService {
+  private readonly logger = new Logger(DeliveryService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityLog: ActivityLogService,
     private readonly orders: OrdersService,
+    private readonly mail: MailService,
+    private readonly sms: SmsService,
   ) {}
 
   // ---------- Admin ----------
@@ -48,9 +64,24 @@ export class DeliveryService {
   listDrivers() {
     return this.prisma.user.findMany({
       where: { role: UserRole.DRIVER, deletedAt: null },
-      select: { id: true, name: true, phone: true },
+      select: { id: true, name: true, phone: true, driverStatus: true },
       orderBy: { name: 'asc' },
     });
+  }
+
+  // Counts by DeliveryStatus, for the admin Dashboard's "active deliveries"
+  // widget — same "compute on read, no stored metric" approach as every
+  // other dashboard figure in this codebase (see DashboardService.summary()
+  // in the HR module).
+  async adminSummary() {
+    const rows = await this.prisma.delivery.groupBy({ by: ['status'], _count: true });
+    const counts: Record<string, number> = { ALL: 0 };
+    for (const s of Object.values(DeliveryStatus)) counts[s] = 0;
+    for (const row of rows) {
+      counts[row.status] = row._count;
+      counts.ALL += row._count;
+    }
+    return counts;
   }
 
   // Upsert, not create-only — reassigning an in-progress delivery to a
@@ -59,7 +90,7 @@ export class DeliveryService {
   // (ASSIGNED, pickup/delivery snapshots cleared) since the new driver
   // hasn't actually done any of that yet; it does NOT touch Order.status,
   // which stays wherever it already was.
-  async assign(orderId: string, driverId: string, actor: ActorInfo, context: RequestInfo = {}) {
+  async assign(orderId: string, driverId: string, priority: DeliveryPriority | undefined, actor: ActorInfo, context: RequestInfo = {}) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found');
 
@@ -68,10 +99,11 @@ export class DeliveryService {
 
     const delivery = await this.prisma.delivery.upsert({
       where: { orderId },
-      create: { orderId, driverId, status: DeliveryStatus.ASSIGNED },
+      create: { orderId, driverId, status: DeliveryStatus.ASSIGNED, priority },
       update: {
         driverId,
         status: DeliveryStatus.ASSIGNED,
+        ...(priority ? { priority } : {}),
         pickupLat: null,
         pickupLng: null,
         pickedUpAt: null,
@@ -96,10 +128,26 @@ export class DeliveryService {
       ...context,
     });
 
+    await this.notifyCustomer(orderId, DeliveryStatus.ASSIGNED, driver.name);
+
     return delivery;
   }
 
   // ---------- Driver self-service ----------
+
+  getMyStatus(driverId: string) {
+    return this.prisma.user.findUniqueOrThrow({ where: { id: driverId }, select: { driverStatus: true } });
+  }
+
+  // Self-reported only (see DriverStatus's schema comment) — never derived
+  // from a driver's current Delivery rows.
+  setMyStatus(driverId: string, status: DriverStatus) {
+    return this.prisma.user.update({
+      where: { id: driverId },
+      data: { driverStatus: status },
+      select: { driverStatus: true },
+    });
+  }
 
   private async getOwnDelivery(driverId: string, id: string) {
     const delivery = await this.prisma.delivery.findFirst({
@@ -110,11 +158,15 @@ export class DeliveryService {
     return delivery;
   }
 
+  // URGENT-first, then oldest-assigned-first within each priority — a
+  // simple, transparent dispatch-priority ordering rather than automated
+  // assignment (which stays manual, per user decision — see
+  // docs/17-infrastructure-platform-roadmap.md).
   listMine(driverId: string) {
     return this.prisma.delivery.findMany({
       where: { driverId },
       include: DELIVERY_INCLUDE,
-      orderBy: { assignedAt: 'desc' },
+      orderBy: [{ priority: 'desc' }, { assignedAt: 'asc' }],
     });
   }
 
@@ -136,6 +188,43 @@ export class DeliveryService {
       if (currentIndex >= i) continue;
       await this.orders.updateStatus(orderId, ORDER_PROGRESSION[i], actor, context);
     }
+  }
+
+  // Best-effort — a notification failure must never fail the delivery
+  // status change itself (same reasoning as AuthService.register()'s
+  // Promise.allSettled around OTP dispatch). Respects the same
+  // notifyOrderUpdatesEmail/notifyOrderUpdatesSms preferences the rest of
+  // the app already stores but has had nothing wired to yet — this is that
+  // wiring, for delivery events specifically.
+  private async notifyCustomer(orderId: string, status: DeliveryStatus, driverName: string) {
+    const template = STATUS_MESSAGE[status];
+    if (!template) return;
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        user: { select: { email: true, phone: true, notifyOrderUpdatesEmail: true, notifyOrderUpdatesSms: true } },
+      },
+    });
+    if (!order?.user) return;
+
+    const message = template(order.orderNumber, driverName);
+    const tasks: Promise<void>[] = [];
+    if (order.user.email && order.user.notifyOrderUpdatesEmail) {
+      tasks.push(
+        this.mail.sendMail({ to: order.user.email, subject: 'ChrisPa delivery update', text: message }).catch((err) =>
+          this.logger.warn(`Delivery email notification failed for order ${order.orderNumber}: ${err}`),
+        ),
+      );
+    }
+    if (order.user.phone && order.user.notifyOrderUpdatesSms) {
+      tasks.push(
+        this.sms.sendSms({ to: order.user.phone, message }).catch((err) =>
+          this.logger.warn(`Delivery SMS notification failed for order ${order.orderNumber}: ${err}`),
+        ),
+      );
+    }
+    await Promise.all(tasks);
   }
 
   async updateStatus(
@@ -208,6 +297,8 @@ export class DeliveryService {
       metadata: { from: delivery.status, to: status },
       ...context,
     });
+
+    await this.notifyCustomer(delivery.orderId, status, delivery.driver.name);
 
     return updated;
   }

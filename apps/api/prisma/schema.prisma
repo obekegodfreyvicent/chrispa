@@ -119,6 +119,11 @@ model User {
   // Postgres treats each NULL as distinct, so clearing them doesn't collide
   // with the @unique constraint even across multiple deleted accounts.
   deletedAt           DateTime?    @db.Timestamptz(3)
+  // Driver App (commit `75b7cff`) — only meaningful for role: DRIVER, same
+  // "field exists on every User regardless of role relevance" convention as
+  // twoFactorEnabled/biometricEnabled above. Self-reported via PATCH
+  // /driver/status; see the DriverStatus enum's own comment.
+  driverStatus        DriverStatus @default(OFFLINE)
   createdAt           DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime     @updatedAt @db.Timestamptz(3)
 
@@ -544,6 +549,22 @@ enum DeliveryStatus {
   FAILED
 }
 
+// Self-reported by the driver (PATCH /driver/status) — whether an admin
+// should consider them for a new assignment right now. Deliberately not
+// derived automatically from their current Delivery rows (a driver going
+// OFFLINE mid-delivery is a real thing — their in-progress delivery keeps
+// going, this is a separate "don't hand me anything new" signal).
+enum DriverStatus {
+  OFFLINE
+  AVAILABLE
+  ON_DELIVERY
+}
+
+enum DeliveryPriority {
+  NORMAL
+  URGENT
+}
+
 // Driver App (per user request, not in the original SRS/wireframes — see
 // docs/SRS.md's HR-module precedent for "scoped and approved directly with
 // the user" net-new features). One row per Order once a driver is assigned
@@ -569,6 +590,11 @@ model Delivery {
   driverId String
   driver   User           @relation("DriverDeliveries", fields: [driverId], references: [id])
   status   DeliveryStatus @default(ASSIGNED)
+  // Set at assignment time (PATCH /admin/orders/:id/assign-driver) — surfaces
+  // URGENT deliveries first in the driver's own list. No automated dispatch
+  // logic reads this yet (assignment is manual, per user decision — see
+  // docs/17-infrastructure-platform-roadmap.md); it's an ordering hint today.
+  priority DeliveryPriority @default(NORMAL)
 
   // Snapshotted at PICKED_UP time from the driver's browser geolocation —
   // deliberately not just copied from Warehouse's own address, since the
