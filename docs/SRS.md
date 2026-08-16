@@ -200,10 +200,35 @@ Requirements are grouped to match the **Feature groups** already annotated in th
 - FR-5.2 Guest checkout option alongside authenticated checkout.
 - FR-5.3 Shipping address form with address auto-complete; Kampala-specific city field; delivery notes.
 - FR-5.4 Delivery method selection: Standard (free), Express, Same-day (Kampala) — each with its own price.
+  **Implemented with pricing that also varies by destination, not just method** (added this session, per user
+  decision, not in the original wireframe): `CheckoutService` used to charge a flat fee per delivery method
+  regardless of the shipping address; it now matches the order's destination city against an admin-managed
+  `ShippingZone` (`ShippingZonesService`) and charges that zone's fee for the chosen method — see FR-5.4a
+  below.
 - FR-5.5 Delivery time-slot selection.
 - FR-5.6 Payment method selection: Mobile Money, Card, Cash on Delivery.
 - FR-5.7 Order summary sidebar with running total. Dual-currency (UGX + USD estimate) — see FR-3.5.
 - FR-5.8 PCI-DSS-compliant payment processing; no raw card data touches ChrisPa servers.
+- **FR-5.4a Admin-managed shipping zones (added this session, not in the original wireframe) — a hard
+  pricing gate, not just a display label.** The new `ShippingZone` model (`apps/api/prisma/schema.prisma`)
+  holds an admin-editable list of zones, each with a `towns` list and a per-delivery-method fee
+  (`standardFeeUgx`/`expressFeeUgx`/`sameDayFeeUgx`, any of which can be left unset to mean that method isn't
+  offered to that zone at all). `ShippingZonesService.priceFor(city, deliveryMethod)` matches the checkout's
+  `shippingAddress.city` case-insensitively/substring-tolerantly against each zone's `towns` (a real Uganda
+  town-name canonical table doesn't exist in this schema, and the City field stays free text), falling back
+  to whichever zone has `isDefault: true` when nothing matches — seeded as "Rest of Uganda" specifically so
+  an unrecognized/misspelled town is priced as upcountry rather than silently defaulting to Kampala's cheaper
+  rates. `CheckoutService` calls this before creating the order and throws a clear `400` if the matched
+  zone doesn't offer the requested delivery method, rather than charging 0 or silently substituting another
+  method. Managed via `/admin/shipping-zones` (`OWNER`/`STORE_MANAGER`, Admin → Shipping Zones) — full CRUD,
+  takes effect on the next checkout immediately, no deploy needed; a public `GET /shipping/quote?city=` (no
+  auth) lets the storefront show live per-method pricing as the customer types their city, before they
+  submit. Per user decision, Same-day delivery is **not hard-blocked outside Kampala** at the code level — an
+  admin can price (or switch off) any method for any zone; the two seeded zones price Same-day everywhere,
+  just more for "Rest of Uganda" (UGX 35,000) than "Kampala Metro" (UGX 12,000). Each order snapshots which
+  zone applied (`Order.shippingZoneName`) alongside the numeric fee it already stored, so a later rate change
+  never rewrites what a past order actually paid — same "snapshot, don't live-join" convention as
+  `OrderItem.vendorId`/HR's `Payslip` rows.
 
 **FR-6 — Order Tracking** (`page-order-track`)
 - FR-6.1 Visual status pipeline: Placed → Packed → Shipped → Delivered.
@@ -704,7 +729,7 @@ Derived from the fields visible across the wireframes (not exhaustive — a full
 - **Warehouse** — id, name, location
 - **InventoryRecord** — id, product_id, warehouse_id, batch_lot, qty_on_hand, reorder_point
 - **Cart** / **CartItem** — persisted per user, synced across devices
-- **Order** — id, order_number, user_id (nullable for guest), status, warehouse_id, subtotal, shipping_fee, discount, total, delivery_method, time_slot, payment_method, delivery_confirmed_at (nullable — customer's own "received in good condition" confirmation, PAY-FR-5), created_at
+- **Order** — id, order_number, user_id (nullable for guest), status, warehouse_id, subtotal, shipping_fee, shipping_zone_name (nullable — the `ShippingZone` that priced this order's shipping_fee, snapshotted at checkout; see FR-5.4a), discount, total, delivery_method, time_slot, payment_method, delivery_confirmed_at (nullable — customer's own "received in good condition" confirmation, PAY-FR-5), created_at
 - **OrderItem** — id, order_id, product_id, variant_id, qty, unit_price
 - **Coupon** — id, code, type, value, usage_count, is_active
 - **Bundle** — id, name, product_ids[], bundle_price

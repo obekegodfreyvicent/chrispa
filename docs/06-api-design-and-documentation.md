@@ -23,6 +23,8 @@
 | `/catalog` | catalog | Public (read) |
 | `/cart` | cart | Authenticated customer |
 | `/checkout` | checkout | Authenticated customer |
+| `/shipping/quote` | shipping | Public — live per-delivery-method fee for a given city, display-only (added this session) |
+| `/admin/shipping-zones` | shipping (admin) | `OWNER`, `STORE_MANAGER` — full CRUD on shipping zones/rates (added this session) |
 | `/orders` | orders | Authenticated customer (own orders) |
 | `/wishlist` | wishlist | Authenticated customer (own) |
 | `/account/addresses` | addresses | Authenticated customer (own) |
@@ -128,3 +130,20 @@ banners, sorted), now actually consumed by the storefront homepage hero instead 
 upload reuses `POST /admin/products/media/upload` rather than a separate endpoint — the same 5MB/JPEG-PNG-
 WEBP-GIF constraints apply. `Blog Posts` remains the one CMS-domain read endpoint (`GET /cms/blog`) with no
 admin write side.
+
+## Shipping zones & delivery pricing
+
+Added this session (per user decision, not in the original SRS/wireframes) — see FR-5.4a in `docs/SRS.md`.
+`/admin/shipping-zones` (`OWNER`/`STORE_MANAGER`) is full CRUD on `ShippingZone`: `GET` (list, sorted by
+`sortOrder`), `POST` (create), `PATCH /:id`, `DELETE /:id` (blocked with a `400` if the zone is the current
+`isDefault` fallback — reassign default first). Every create/update re-validates that exactly one zone has
+`isDefault: true`, throwing a `400` rather than silently leaving zero or multiple defaults.
+
+`GET /shipping/quote?city=<name>` is public (no auth) — returns `{ zoneId, zoneName, rates: { STANDARD,
+EXPRESS, SAME_DAY } }`, each rate `{ available, feeUgx }` (`feeUgx: null`/`available: false` means that zone
+doesn't offer that method). This is what the storefront checkout page calls live as the customer types their
+city, to show real prices and grey out unavailable methods before they submit — it is **display-only**;
+`CheckoutService` independently recomputes the identical quote server-side at order-creation time via
+`ShippingZonesService.priceFor()` and throws a `400` if the submitted `deliveryMethod` isn't available for
+the matched zone, so a tampered/stale client request can't check out with the wrong fee or a method the
+destination doesn't actually support.

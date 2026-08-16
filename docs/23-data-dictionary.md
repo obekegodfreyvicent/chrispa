@@ -5,7 +5,7 @@ same domain sections as [`03-database-design.md`](./03-database-design.md)'s sch
 [`22-entity-relationship-diagram.md`](./22-entity-relationship-diagram.md) for how these models relate to
 each other.
 
-**Freshness note**: generated against commit `3b5fc6a` (2026-08-16) — a point-in-time artifact, not
+**Freshness note**: generated against commit `7e197b9` (2026-08-17) — a point-in-time artifact, not
 auto-synced to the live schema; treat any discrepancy with the current `schema.prisma` as this document
 having drifted, not the code being wrong.
 
@@ -261,7 +261,8 @@ Join table. Composite PK `(productId, wellnessTagId)`, both Cascade.
 | status | OrderStatus | No | PENDING | State machine — see `ALLOWED_TRANSITIONS` in `orders.service.ts` |
 | warehouseId | String | Yes | — | FK → Warehouse |
 | subtotalUgx | Int | No | — | |
-| shippingFeeUgx | Int | No | 0 | |
+| shippingFeeUgx | Int | No | 0 | Priced by destination + delivery method via `ShippingZonesService` (added this session) — see the `ShippingZone` table below |
+| shippingZoneName | String | Yes | — | Added this session — the `ShippingZone.name` that priced shippingFeeUgx, snapshotted at checkout time (never a live join, so a later rate change doesn't rewrite past orders); null on orders placed before this feature existed |
 | discountUgx | Int | No | 0 | |
 | vatUgx | Int | No | 0 | Uganda VAT (18%), broken out separately — collected on URA's behalf, not ChrisPa revenue |
 | totalUgx | Int | No | — | |
@@ -272,6 +273,22 @@ Join table. Composite PK `(productId, wellnessTagId)`, both Cascade.
 | deliveryConfirmedAt | DateTime | Yes | — | Customer-only signal, separate from staff-set `status: DELIVERED` — "mutual consent" the printable receipt requires |
 | createdAt / updatedAt | DateTime | No | now() / auto | |
 | — | — | — | — | `@@index([userId])`, `@@index([warehouseId])`, `@@index([status])` |
+
+### ShippingZone
+
+Added this session (per user decision, not in the original SRS) — admin-managed shipping pricing. Replaces
+the old flat per-delivery-method fee table in `CheckoutService`. See FR-5.4a in `docs/SRS.md`.
+
+| Field | Type | Nullable | Default | Notes |
+|---|---|---|---|---|
+| name | String | No | — | `@unique` |
+| towns | String[] | No | `[]` | Free-text town/city names matched case-insensitively/substring-tolerantly against `Order.shippingAddress.city` — not a canonical Uganda-locations table, none exists in this schema |
+| isDefault | Boolean | No | false | Exactly one zone must have this true at any time — the fallback when a city matches no zone's `towns`; enforced in `ShippingZonesService`, not a DB constraint |
+| standardFeeUgx | Int | Yes | — | Null means Standard isn't offered to this zone at all, distinct from 0 ("free") |
+| expressFeeUgx | Int | Yes | — | Same null-means-unavailable convention as standardFeeUgx |
+| sameDayFeeUgx | Int | Yes | — | Same convention — per user decision, Same-day is NOT hard-blocked outside Kampala at the code level, an admin can price/disable it per zone |
+| sortOrder | Int | No | 0 | Match priority when a town could plausibly belong to more than one zone, and the admin list page's display order |
+| createdAt / updatedAt | DateTime | No | now() / auto | |
 
 ### OrderItem
 
@@ -911,7 +928,7 @@ treated as its own domain in `03-database-design.md`'s inventory table.
 | DeliveryStatus | ASSIGNED, EN_ROUTE_TO_PICKUP, PICKED_UP, EN_ROUTE_TO_CUSTOMER, DELIVERED, FAILED | Driver App (commit `75b7cff`, not in original SRS) — `PICKED_UP`/`DELIVERED` mirror onto `Order.status` (SHIPPED/DELIVERED respectively); `FAILED` reachable from any in-progress state, terminal like `DELIVERED` |
 | DriverStatus | OFFLINE, AVAILABLE, ON_DELIVERY | Added commit `445a258` — self-reported driver availability, `User.driverStatus` |
 | DeliveryPriority | NORMAL, URGENT | Added commit `445a258` — set at assignment, ordering hint for the driver's own list |
-| DeliveryMethod | STANDARD, EXPRESS, SAME_DAY | |
+| DeliveryMethod | STANDARD, EXPRESS, SAME_DAY | Fee for each is looked up per-`ShippingZone` (added this session), not a fixed price per method |
 | CouponType | PERCENT_OFF, FIXED_OFF, FREE_SHIPPING | |
 | TicketStatus | OPEN, IN_PROGRESS, RESOLVED, CLOSED | |
 | CmsStatus | DRAFT, PUBLISHED | Shared by CmsPage/BlogPost |

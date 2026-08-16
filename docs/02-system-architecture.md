@@ -43,8 +43,10 @@ The template's assumed flows (§3) map onto ChrisPa as follows:
 2. `JwtAuthGuard` verifies the JWT signature; `MustChangePasswordGuard` (global, `APP_GUARD`) checks the
    `mustChangePassword` claim decoded from the same JWT.
 3. `CheckoutService` validates the cart, checks per-warehouse stock (FIFO across batches), computes pricing
-   (delivery fee + optional coupon), and — inside a single Prisma `$transaction` — creates the `Order` and its
-   `OrderItem`s, decrements `InventoryRecord`, awards loyalty points, and clears the cart.
+   (delivery fee — looked up from the matching admin-managed `ShippingZone` by destination city + delivery
+   method, added this session, see `ShippingZonesService` — + optional coupon), and — inside a single Prisma
+   `$transaction` — creates the `Order` and its `OrderItem`s, decrements `InventoryRecord`, awards loyalty
+   points, and clears the cart.
 4. Response returns the created order; the storefront redirects to an order-confirmation view.
 
 This end-to-end path (validation → guarded controller → transactional service → Postgres) is the pattern

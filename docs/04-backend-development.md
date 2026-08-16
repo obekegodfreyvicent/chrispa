@@ -39,8 +39,8 @@ Adapts template §8.
 `apps/api/src/modules/*` — each is a self-contained Nest module (controller + service, sometimes `dto/`):
 
 `account-notifications`, `account-settings`, `addresses`, `admin-users`, `auth`, `cart`, `catalog`, `chat`,
-`checkout`, `cms`, `crm`, `finance`, `health`, `hr`, `inventory`, `loyalty`, `marketing`, `marketplace`,
-`orders`, `payment-methods`, `payments`, `profile`, `support`, `wishlist`.
+`checkout`, `cms`, `crm`, `delivery`, `finance`, `health`, `hr`, `inventory`, `loyalty`, `marketing`,
+`marketplace`, `orders`, `payment-methods`, `payments`, `profile`, `shipping`, `support`, `wishlist`.
 
 Most mirror the SRS's FR groups directly; `hr` is a later, separately-scoped addition (see
 `docs/SRS.md` §18). `health`, `profile`, `account-settings`, and `account-notifications` are

@@ -103,6 +103,7 @@ just hasn't been wired to them. Until that exists, a forgotten staff password mu
 | Assign/reassign a driver to an order | Admin → Orders → an order → Delivery / Driver | `OWNER`, `STORE_MANAGER`, `FULFILLMENT` |
 | Work an assigned delivery (pickup/delivery, GPS) | Admin → My Deliveries | `DRIVER` (own assigned deliveries only) |
 | View every driver's deliveries (read-only oversight) | Admin → Deliveries | `OWNER`, `STORE_MANAGER`, `FULFILLMENT` |
+| Add/edit/remove a shipping zone or its rates | Admin → Shipping Zones | `OWNER`, `STORE_MANAGER` |
 
 ## Assigning and tracking deliveries (Driver App)
 
@@ -199,6 +200,33 @@ decision that isn't a code choice):
 - **Surge/dynamic delivery pricing, QR/barcode scanning, fraud detection, geofencing/delivery-zone
   management, multi-currency support** — none of these have a defined policy or requirement yet; flagged here
   so a future request to add one of them starts from an explicit decision, not a silent assumption.
+
+## Setting shipping zones and delivery pricing
+
+Added this session, per user decision (not in the original SRS/wireframes) — shipping used to be a flat fee
+per delivery method (Standard free, Express UGX 8,000, Same-day UGX 12,000) regardless of where the order was
+going. It's now priced by **both** destination and delivery method, editable from **Admin → Shipping Zones**
+(`OWNER`/`STORE_MANAGER`), and takes effect on the very next checkout — no deploy needed.
+
+1. Each **zone** has a name, a list of towns/cities it covers, and a fee for each of Standard/Express/Same-day
+   — leave a fee blank to switch that delivery method off entirely for that zone (shown as "Not offered" on
+   the zone card, and greyed out for the customer at checkout).
+2. Exactly one zone must be marked **Default** at all times — it's the fallback whenever a customer's typed
+   city doesn't match any zone's town list (a typo, an unlisted village, etc.). You can't delete the current
+   default zone or leave zero/multiple zones marked default; the form blocks it with a clear error. ChrisPa
+   ships with two zones seeded: **Kampala Metro** (the original flat rates above) and **Rest of Uganda**
+   (the default — higher rates for Standard/Express, and Same-day priced at UGX 35,000 rather than switched
+   off, since per user decision Same-day isn't hard-blocked outside Kampala, just priced for the distance).
+3. Matching is case-insensitive and substring-tolerant against the town list (so "Kampala", "kampala uganda,"
+   etc. all match) — it is **not** a dropdown of official Uganda administrative divisions, since the
+   storefront's City field has always been free text. Add every spelling/neighborhood variant you want a zone
+   to catch directly to its town list.
+4. The customer sees this live: on the Checkout page, delivery-method prices update as they type their city,
+   and any method the matched zone doesn't offer becomes unselectable. The server independently re-checks the
+   same pricing at order placement (`CheckoutService`) — it never trusts whatever the browser last displayed,
+   so a stale page or a tampered request can't check out at the wrong fee or with an unavailable method.
+5. Every order snapshots which zone priced it (`Order.shippingZoneName`, shown next to the Shipping line on
+   Admin → Orders → an order) — editing a zone's rates later never rewrites what a past order actually paid.
 
 ## Customer receipts require the customer's own confirmation first
 

@@ -1,6 +1,6 @@
 # 22. Entity Relationship Diagram
 
-**Freshness note**: generated against commit `3b5fc6a` (2026-08-16), `apps/api/prisma/schema.prisma` as of
+**Freshness note**: generated against commit `7e197b9` (2026-08-17), `apps/api/prisma/schema.prisma` as of
 that commit — a point-in-time artifact, not auto-synced; re-generate by hand after schema changes. See
 [`03-database-design.md`](./03-database-design.md) for the narrative overview, and
 [`23-data-dictionary.md`](./23-data-dictionary.md) for full field-level detail.
@@ -143,6 +143,14 @@ actually read.
 - **`Bundle.productIds`** is a scalar `String[]` of Product IDs, not a join table — no referential integrity
   (a deleted/archived product ID can linger in a bundle's array unnoticed); a deliberate simplification, not
   an oversight, per the schema's own comment.
+- **`ShippingZone` has no foreign-key relationship to `Order` at all** (added this session, per user
+  decision, not in the original SRS) — `Order.shippingZoneName` is a plain `String?` snapshot of whichever
+  zone's name priced that order's `shippingFeeUgx` at checkout time, not a `zoneId` relation. Deliberate, same
+  "snapshot, don't live-join" reasoning as `OrderItem.vendorId`/HR's `Payslip` rows: a zone can be renamed or
+  deleted later without a real FK to worry about, and a past order's receipt keeps showing exactly what
+  applied when it was placed. Zone matching itself (`ShippingZonesService.priceFor()`) is data-driven, not
+  FK-driven — it string-matches the order's `shippingAddress.city` (itself unstructured `Json`, not a
+  relation) against each zone's `towns` array.
 - **Notable `@@unique` constraints** beyond simple PK/FK uniqueness: `InventoryRecord`
   `[productId, warehouseId, batchLot]`; `CartItem` `[cartId, productId, variantId]` (Postgres's NULL-is-distinct
   behavior means this doesn't dedupe null-variant rows — handled in application code, see

@@ -133,8 +133,16 @@ The summary panel shows your subtotal and total, with a **Proceed to Checkout** 
 
 You'll need to be logged in. Fill in:
 
-1. **Shipping details** — recipient name, phone, address, city, and any delivery notes.
-2. **Delivery method** — Standard (free), Express (UGX 8,000), or Same-day within Kampala (UGX 12,000).
+1. **Shipping details** — recipient name, phone, address, city, and any delivery notes. As you type your
+   city, the delivery-method prices below update live — shipping is priced by destination as well as method
+   now (added this session, per ChrisPa's decision), so Kampala and upcountry addresses see different fees
+   for the same method. An unrecognized/misspelled city is priced as upcountry (safer to overcharge shipping
+   than undercharge it), and any delivery method the matched area doesn't offer shows greyed out and can't be
+   selected.
+2. **Delivery method** — Standard, Express, or Same-day, each showing its real price for the city you just
+   entered (Free/UGX amount, or "Unavailable" if not offered there). These figures are examples, not fixed:
+   Kampala's Standard is free today, but an admin can change any zone's rates at any time from the back
+   office — see [`16-user-and-administrator-procedures.md`](./16-user-and-administrator-procedures.md).
 3. **Promo code** (optional) — if you have a coupon, enter it here.
 4. **Payment method** — **Cash on Delivery** is available today. Mobile Money and Card are shown as "coming
    soon" — ChrisPa hasn't connected a payment gateway for them yet.

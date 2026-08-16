@@ -6,7 +6,7 @@ blocks, not Mermaid — `md_to_docx.py` (the script that generates this document
 blocks to literal monospace text but does not render Mermaid syntax as an actual diagram, so Mermaid would only
 work in the `.md` and show as broken syntax in Word. ASCII art renders identically and correctly in both.
 
-**Freshness note**: generated against commit `a29e0cf` (2026-08-16), the schema/service layer as of that
+**Freshness note**: generated against commit `7e197b9` (2026-08-17), the schema/service layer as of that
 commit. This is a point-in-time artifact, not auto-synced to the live codebase — re-generate by hand after a
 schema or major flow change, the same convention as
 [`22-entity-relationship-diagram.md`](./22-entity-relationship-diagram.md) and
@@ -224,6 +224,14 @@ see the Registration & OTP diagram below for where they sit.
   `PaymentTransaction` in the data dictionary for the schema that's ready once one is).
 - `deliveryConfirmedAt` is a separate, customer-only signal from staff-set `status: DELIVERED` — the
   "mutual consent" the printable receipt requires.
+- **Shipping fee (added this session, per user decision)**: before step 1.0's `$transaction` opens,
+  `1.0 Checkout` calls `ShippingZonesService.priceFor(city, deliveryMethod)`, which matches the shipping
+  address's city against an admin-managed `ShippingZone` (falling back to whichever zone is `isDefault`) and
+  returns that zone's fee for the chosen delivery method — throwing a `400` first if the matched zone doesn't
+  offer that method at all, before any cart/stock work happens. The zone's name is snapshotted onto
+  `Order.shippingZoneName` alongside the numeric fee. Replaces the old flat per-delivery-method fee table
+  that ignored the destination entirely — see [`16-user-and-administrator-procedures.md`](./16-user-and-administrator-procedures.md)
+  for how an admin edits zones/rates at Admin → Shipping Zones.
 
 ## Level 1 — Driver App: Assignment & Delivery Tracking
 

@@ -184,6 +184,16 @@ them blindly during a stale-looking review.
   confirmation date; both now show the hour too. See `docs/SRS.md`'s "virtual stamp" note and
   [`19-storefront-user-manual.md`](./19-storefront-user-manual.md) (both updated in `.md`; their `.docx`s
   are among the ones currently open, per the note above).
+- **Admin-managed shipping zones** (per user decision, not in the original SRS) — shipping used to be a flat
+  fee per delivery method (Standard free, Express UGX 8,000, Same-day UGX 12,000) regardless of destination.
+  A new `ShippingZone` model (admin-editable towns list + per-`DeliveryMethod` fee, one zone flagged
+  `isDefault` as the fallback for an unmatched city) replaces that flat table — `CheckoutService` now matches
+  the order's destination and charges that zone's rate, rejecting a delivery method the matched zone doesn't
+  offer rather than silently mispricing it. Managed at Admin → Shipping Zones (`OWNER`/`STORE_MANAGER`); a
+  public `GET /shipping/quote` lets the storefront show live prices as the customer types their city. Per
+  user decision, Same-day is priced higher outside Kampala rather than hard-blocked there. See FR-5.4a in
+  `docs/SRS.md`, [`03`](./03-database-design.md), [`06`](./06-api-design-and-documentation.md), and
+  [`16`](./16-user-and-administrator-procedures.md).
 - **Three near-term priorities** stand out across this whole set as worth doing before the rest: push the
   repo to a remote, add database backups, and wire forgot-password/login-alert/staff-temp-password delivery
   to the email+SMS services (registration OTP already uses real Brevo (HTTP API, not SMTP — see

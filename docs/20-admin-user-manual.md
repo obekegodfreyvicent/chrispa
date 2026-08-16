@@ -53,9 +53,12 @@ You're then taken straight to the dashboard, fully signed in with your own passw
 
 ### Finding your way around
 
-The sidebar is grouped into up to four collapsible sections (only the ones your role can see appear at all):
-**Admin / Backend**, **Human Resources**, **My HR**, and **Financial & Accounting**. Your session
-automatically signs you out after 5 minutes of inactivity.
+The sidebar is grouped into up to five collapsible sections (only the ones your role can see appear at all):
+**Admin / Backend** (Product Manager, Order Management, Inventory, Customers, Marketing & Promos, Shipping
+Zones, CMS, and — Owner only — Users & Settings/Activity Log), **Human Resources**, **My HR**, **Financial &
+Accounting**, and **Deliveries** (a driver's own assigned deliveries, or — for Owner/Store Manager/
+Fulfillment — a read-only view across every driver's). Your session automatically signs you out after 5
+minutes of inactivity.
 
 ![The admin Dashboard — sidebar navigation and top-line KPI tiles](./screenshots/admin-dashboard.png)
 
@@ -165,7 +168,32 @@ notification, and every send is logged below as a **Past Campaigns** entry (subj
 and in the Activity Log. There's no unsubscribe-link-in-email flow, per-recipient delivery receipts, or
 audience segmentation yet — every active subscriber gets every campaign.
 
-## 7. CMS / Site Builder
+## 7. Shipping Zones
+
+*Owner, Store Manager.* (Not Fulfillment.)
+
+Added this session, per user decision — not in the original SRS/wireframes. Shipping used to be a flat fee
+per delivery method (Standard free, Express UGX 8,000, Same-day UGX 12,000) no matter where the order was
+going; it's now priced by **both** destination and delivery method, and you control the rates here.
+
+**Admin → Shipping Zones** lists every zone: its name, the towns/cities it covers, and its fee for each of
+Standard/Express/Same-day. **+ Add Zone** to create one, **Edit** to change its towns or rates, **Remove** to
+delete it (blocked if it's the current Default zone — make another zone Default first).
+
+- Leave a fee field blank to switch that delivery method off entirely for a zone — it shows "Not offered" on
+  the zone card and becomes unselectable for a customer whose city matches that zone at checkout.
+- Exactly one zone must be marked **Default** — the fallback for any city that doesn't match any zone's town
+  list (a typo, an unlisted village, etc.). ChrisPa ships with two zones: **Kampala Metro** and **Rest of
+  Uganda** (the default, priced higher — including Same-day, which per user decision isn't switched off
+  outside Kampala, just priced for the distance).
+- Town matching is case-insensitive and forgiving of extra words ("Kampala", "kampala uganda" both match a
+  zone listing "Kampala") — it's plain text, not a dropdown of official Uganda administrative divisions, so
+  list every spelling/neighborhood variant you want a zone to catch.
+- Changes apply to the very next checkout — no deploy needed. A customer sees this live on the Checkout page
+  as they type their city; the server independently re-checks the same pricing when the order is actually
+  placed, so nothing can complete at a stale or tampered price.
+
+## 8. CMS / Site Builder
 
 *All Admin/Backend roles can view; Owner and Store Manager can also manage Pages, Banners, and Social Media
 Accounts.*
@@ -200,7 +228,7 @@ Connected & Social page — one list, two places it shows up.
 - Click **Active**/**Hidden** to show or hide it without deleting it; **Edit** to change the platform, URL,
   or display order; **Remove** to delete it outright (confirms first).
 
-## 8. Support Tickets
+## 9. Support Tickets
 
 *Owner, Store Manager, Support Agent.* (Not Fulfillment.)
 
@@ -219,7 +247,7 @@ details, any related order, and the full conversation.
 - **Closed is a hard stop** — neither you nor the customer can post further until you move it to a different
   status first.
 
-## 9. Users & Settings / Activity Log
+## 10. Users & Settings / Activity Log
 
 *Owner only.*
 
@@ -237,7 +265,7 @@ showing who did it (their real name and department, where known), filterable by 
 department, plus free-text search and pagination. This is your audit trail; it doesn't cover literally every
 mutation in the system, just the representative write paths that matter most.
 
-## 10. Human Resources
+## 11. Human Resources
 
 *Owner, HR Manager.*
 
@@ -290,7 +318,7 @@ Manager/Fulfillment/HR Manager/Support Agent), same as everywhere else in this c
 ![The Attendance oversight table — every employee's clock-in/out times and computed hours](./screenshots/admin-hr-attendance.png)
 
 A read-only oversight table of every employee's clock-in/clock-out times and computed hours — see
-[My HR](#11-my-hr--self-service) below for how employees clock in themselves. There's no manual
+[My HR](#12-my-hr--self-service) below for how employees clock in themselves. There's no manual
 correction tool here yet.
 
 ### Leave Requests
@@ -336,7 +364,7 @@ Every payslip is expandable to show its full breakdown: basic pay, allowances (t
 overtime, bonus, PAYE, employer NSSF, penalties, and advance repayments — all computed against Uganda's
 real, current tax bands.
 
-## 11. My HR — Self-Service
+## 12. My HR — Self-Service
 
 *Any staff member with a linked employee record, regardless of role.*
 
@@ -374,7 +402,7 @@ real, current tax bands.
 
   ![My Salary Advances](./screenshots/admin-my-hr-advances.png)
 
-## 12. Financial & Accounting
+## 13. Financial & Accounting
 
 *Owner only.*
 
@@ -399,7 +427,7 @@ top, and seven tabs:
 - **Expenses** — record a one-off operating expense (server/hosting, software, marketing, etc.) against an
   entity and a "paid from" account.
 
-## 13. Quick Reference: Common Tasks
+## 14. Quick Reference: Common Tasks
 
 | Task | Where | Who |
 |---|---|---|
@@ -409,6 +437,7 @@ top, and seven tabs:
 | Respond to / close a support ticket | Support Tickets → a ticket | Owner, Store Manager, Support Agent |
 | Add/edit/publish/remove a page, banner, or social media account | CMS / Site Builder | Owner, Store Manager |
 | Compose and send a newsletter (email + in-app) | Marketing & Promos → Compose Newsletter | Owner, Store Manager |
+| Add/edit a shipping zone or its delivery-method rates | Shipping Zones | Owner, Store Manager |
 | Grant a staff login | HR → Employees → an employee → System Login | Owner, HR Manager |
 | Approve/reject leave | HR → Leave Requests | Owner, HR Manager |
 | Run and finalize payroll | HR → Payroll | Owner, HR Manager |
@@ -427,6 +456,7 @@ top, and seven tabs:
 | Inventory | Live read view with low-stock flagging | Purchase orders, transfers, cycle counts |
 | Customers (CRM) | Tier & order-count list | Per-customer detail, notes/tags, campaign export |
 | Marketing & Promos | View coupons/bundles, newsletter subscriber list, compose &amp; send newsletter (email + in-app, with follow-us links) | Creating/editing coupons and bundles, audience segmentation, scheduling/drafts |
+| Shipping Zones | Full CRUD on zones/rates, priced by destination + delivery method, live at checkout | Zones are free-text town lists, not official Uganda administrative divisions |
 | CMS / Site Builder | Full CRUD on Pages, Banners, Social Media Accounts | Blog Posts write access, drag-and-drop builder, cross-page publish workflow, multi-slide hero carousel |
 | Support Tickets | Full review & response workflow | — |
 | Users & Settings | Admin user list | Inviting a new admin, integration toggles |
